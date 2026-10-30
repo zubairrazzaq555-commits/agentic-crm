@@ -33,8 +33,8 @@ PROGRESS
 │
 ├── Phase 3 — LangGraph Foundation    (ACTIVE)
 │   ├── 3.1 Core & State Patterns     ✅  (TypedDict state, deterministic nodes, sequential graph, compile/invoke)
-│   ├── 3.2 Execution Topologies      ⏳  (NEXT: Conditional routing, iterative loops, parallel fan-out/in)
-│   └── 3.3 Provider/Task Integration ⏳  (Graph wiring with ProviderManager & Task models)
+│   ├── 3.2 Execution Topologies      ✅  (Conditional branching, iterative loops, parallel fan-out/in)
+│   └── 3.3 Provider/Task Integration ⏳  (NEXT: Graph wiring with ProviderManager & Task models)
 │
 ├── Phase 4 — Agent Hierarchy         ⏳  (Orchestrator, Sales Agent, CLI Intake)
 │
@@ -45,7 +45,7 @@ PROGRESS
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 229 tests passed (exit code 0)
+**Last verified test count:** 236 tests passed (exit code 0)
 
 ---
 
@@ -58,20 +58,19 @@ PROGRESS
 | 1.3 Task & Queue | Task model, persistent queue, status lifecycle, priority | `src/core/task.py`, `src/core/queue.py` | `tests/test_task.py`, `tests/test_queue.py` |
 | 2.1 Provider System | BaseProvider ABC, ProviderManager registry, health checks, circuit breaker, rate-limit backoff, paid-provider rejection | `src/providers/base.py`, `src/providers/manager.py`, `src/providers/health.py`, `src/providers/exceptions.py` | `tests/test_provider_base.py`, `tests/test_provider_manager.py` |
 | 3.1 LangGraph Core | LangGraph dependency, typed BasicState, deterministic nodes, sequential graph flow: START -> node_one -> node_two -> END | `src/graph/state.py`, `src/graph/basic_graph.py`, `src/graph/__init__.py` | `tests/test_langgraph_basic.py` (5 tests) |
+| 3.2 Execution Topologies | Conditional branching (`add_conditional_edges`), iterative loops with max safety ceiling, parallel branches with `operator.add` fan-in | `src/graph/conditional_graph.py`, `src/graph/loop_graph.py`, `src/graph/parallel_graph.py` | `tests/test_langgraph_topologies.py` (7 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 3.1 complete. Preparing for Milestone 3.2.
+**Active milestone:** Milestone 3.2 complete. Ready for Milestone 3.3.
 
-**Milestone 3.1 Status:** COMPLETE
-- Added `langgraph>=0.2.0` dependency to `pyproject.toml`.
-- Implemented `BasicState` (TypedDict with input, output, step).
-- Created deterministic nodes (`node_one`, `node_two`) operating without external APIs or LLMs.
-- Constructed and compiled `StateGraph` with topology `START -> node_one -> node_two -> END`.
-- Built convenience invocation helper `run_basic_graph()`.
-- Verified 5 focused unit tests + full regression suite (229 passed, exit code 0).
+**Milestone 3.2 Status:** COMPLETE
+- Implemented **Conditional Branching** (`src/graph/conditional_graph.py`) using `add_conditional_edges()`, dynamic score routing, and dual exit paths (APPROVED / REJECTED).
+- Implemented **Iterative Loops** (`src/graph/loop_graph.py`) cycling through graph edges with explicit goal completion and max iteration safety termination (`MAX_ITERATIONS_REACHED`).
+- Implemented **Parallel Execution** (`src/graph/parallel_graph.py`) executing 3 concurrent evaluation branches with clean fan-in aggregation using `Annotated[List[str], operator.add]` state reducer.
+- Tested: 12 focused LangGraph tests passing; 236 total regression tests passing (exit code 0).
 
 ---
 
@@ -91,6 +90,8 @@ None currently.
 | Async | Full asyncio | Needed for concurrent provider calls |
 | LangGraph | Core state-machine layer | Graph-based orchestration for orchestrator & domain agents |
 | Graph State | TypedDict (`total=False`) | Canonical LangGraph pattern for partial state updates |
+| Parallel State Reducer | `Annotated[List, operator.add]` | Prevents state update conflicts during parallel fan-in |
+| Loop Safety | Explicit max iterations ceiling | Prevents graph infinite execution loops under any condition |
 | Concrete Providers | Deferred to Phase 5 | Fake/mock providers via ProviderManager suffice for LangGraph |
 | First CRM domain | Leads | Most self-contained workflow |
 | License | MIT | Simple, permissive |
@@ -100,15 +101,14 @@ None currently.
 
 ## Next Step
 
-**Milestone 3.2 — Execution Topologies (Branching, Loops & Parallel)**
+**Milestone 3.3 — Provider & Task Integration**
 
-Implement and verify non-linear graph patterns in `src/graph/`:
-- Conditional routing edges (`add_conditional_edges`)
-- Iterative cycles / loops with termination conditions
-- Parallel node branches with fan-out and state fan-in / merging
-- Focused unit tests verifying routing logic and termination safety
+Integrate graph execution with existing system primitives:
+- Wire graph nodes with `ProviderManager` using test/mock providers
+- Map CRM `Task` data models to and from LangGraph state
+- Verify end-to-end task execution inside graph nodes
 
-Reference: `docs/roadmap.md` → Phase 3, Milestone 3.2
+Reference: `docs/roadmap.md` → Phase 3, Milestone 3.3
 
 ---
 
@@ -117,15 +117,16 @@ Reference: `docs/roadmap.md` → Phase 3, Milestone 3.2
 ```
 Branch:      main
 Remote:      origin/main
-Last commit: 4b6bc29  docs: realign roadmap for LangGraph foundation
+Last commit: 2520cfb  feat: add LangGraph foundation (Milestone 3.1)
 
 Uncommitted work:
-  MODIFIED  pyproject.toml
   MODIFIED  docs/development_log.md
-  NEW       src/graph/__init__.py
-  NEW       src/graph/basic_graph.py
-  NEW       src/graph/state.py
-  NEW       tests/test_langgraph_basic.py
+  MODIFIED  src/graph/__init__.py
+  MODIFIED  src/graph/state.py
+  NEW       src/graph/conditional_graph.py
+  NEW       src/graph/loop_graph.py
+  NEW       src/graph/parallel_graph.py
+  NEW       tests/test_langgraph_topologies.py
 ```
 
 ---
@@ -164,4 +165,5 @@ Resolution: <one-line description>
 | 2026-10-22 | Milestone 2C report — committed as `899c8aa` |
 | 2026-10-31 | Step 2.1 Provider System implemented. Committed and pushed as `79b3866`. |
 | 2026-10-31 | Strategic Roadmap Realignment: Prioritized Phase 3 LangGraph Foundation. Committed and pushed as `4b6bc29`. |
-| 2026-10-31 | Milestone 3.1: LangGraph Core & State Patterns implemented. 229 tests passed (exit code 0). |
+| 2026-10-31 | Milestone 3.1: LangGraph Core & State Patterns implemented. 229 tests passed (exit code 0). Committed and pushed as `2520cfb`. |
+| 2026-10-31 | Milestone 3.2: Execution Topologies (Conditional, Loop, Parallel) implemented. 236 tests passed (exit code 0). |
