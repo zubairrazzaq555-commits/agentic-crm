@@ -48,3 +48,4 @@ def create_initial_sales_state(
         "error_message": None,
         "step": 0,
     }
+

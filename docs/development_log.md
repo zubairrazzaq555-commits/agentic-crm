@@ -62,20 +62,20 @@ PROGRESS
 | 3.3 Provider & Task Integration | Task-to-Graph mapping, ProviderManager async invocation, MockProvider, TaskExecutor lifecycle (PENDING -> RUNNING -> COMPLETED/FAILED) | `src/providers/mock_provider.py`, `src/graph/task_state.py`, `src/graph/task_graph.py`, `src/core/task_executor.py` | `tests/test_task_graph.py`, `tests/test_task_executor.py` (9 tests) |
 | 4.1 Grandparent Orchestrator | Hierarchical top-level dispatcher: OrchestratorState schema, deterministic rule-based domain classifier, decoupled domain handler nodes (sales, marketing, customer_service, data, unknown), compiled LangGraph StateGraph, sync/async GrandparentOrchestrator | `src/agents/orchestrator/state.py`, `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/handlers.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/__init__.py` | `tests/test_orchestrator.py` (37 tests) |
 | 4.2 Sales Domain Agent Foundation | SalesAgentState schema, deterministic sales subdomain classifier (`lead_management`, `opportunity_management`, `deal_management`, `general_sales`), decoupled subdomain handlers, compiled LangGraph StateGraph, sync/async SalesDomainAgent, Grandparent Orchestrator integration | `src/agents/sales/state.py`, `src/agents/sales/classifier.py`, `src/agents/sales/handlers.py`, `src/agents/sales/agent.py`, `src/agents/sales/__init__.py`, `src/agents/__init__.py` | `tests/test_sales_agent.py` (39 tests) |
+| 4.3 CLI Intake Layer | Command-line task intake: ArgumentParser (`argparse`), `submit_task` persistent task queue intake + DB lifecycle update (`PENDING -> RUNNING -> COMPLETED/FAILED`), Grandparent Orchestrator execution, `format_task_output` (text/json), `src/main.py` entrypoint | `src/cli/parser.py`, `src/cli/intake.py`, `src/cli/__init__.py`, `src/main.py` | `tests/test_cli.py` (13 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 4.2 complete. Preparing for Milestone 4.3 (CLI Intake Layer).
+**Active milestone:** Milestone 4.3 complete. Phase 4 (Agent Hierarchy) complete. Preparing for Phase 5 (Concrete Providers & Task/Model Router - Milestone 5.1 Ollama).
 
-**Milestone 4.2 Status:** COMPLETE
-- Implemented **SalesAgentState** (`src/agents/sales/state.py`) TypedDict schema with task tracking, sales subdomain classification, execution status, and handler result.
-- Implemented **Sales Task Classifier** (`src/agents/sales/classifier.py`) deterministic multi-layer tokenization, prefix matching, keyword scoring, and specialized category prioritization (`lead_management`, `opportunity_management`, `deal_management`, fallback to `general_sales`).
-- Implemented **Decoupled Sales Handlers** (`src/agents/sales/handlers.py`) placeholder handlers for Lead Management, Opportunity Management, Deal Management, and General Sales.
-- Implemented **Sales Domain Graph & Class** (`src/agents/sales/agent.py`) StateGraph with conditional edges and sync `execute()` / async `aexecute()` invocation.
-- Implemented **Grandparent Orchestrator Integration** (`src/agents/orchestrator/handlers.py`) routing sales tasks into `SalesDomainAgent` with nested execution result reporting while preserving backward compatibility.
-- Tested: 39 focused sales agent tests passing; 321 total regression tests passing (exit code 0).
+**Milestone 4.3 Status:** COMPLETE
+- Implemented **ArgumentParser** (`src/cli/parser.py`) standard library `argparse` with positional description, `-t/--task-type`, `-p/--payload`, `--priority`, `--domain`, `--json`, and `--db-url`.
+- Implemented **Task Intake Coordinator** (`src/cli/intake.py`) managing task packaging, persistent queue registration via `enqueue_task`, lifecycle tracking (`RUNNING` to `COMPLETED`/`FAILED`), and execution delegation through `GrandparentOrchestrator`.
+- Implemented **Formatters & CLI Runner** (`src/cli/intake.py`) terminal text/json formatting with nested subdomain detail display and async/sync runners (`run_cli`, `main`).
+- Implemented **Top-level Application Entrypoint** (`src/main.py`) enabling direct invocation (`python -m src.main "Qualify lead John Doe"`).
+- Tested: 13 focused CLI tests passing; 334 total regression tests passing (exit code 0).
 
 ---
 

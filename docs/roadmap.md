@@ -173,21 +173,22 @@ gantt
 | **Dependencies** | Milestone 4.1 |
 | **Status** | **COMPLETED** |
 
-### Milestone 4.3 — CLI Intake Layer (NEXT)
+### Milestone 4.3 — CLI Intake Layer ✅
 | Item | Detail |
 |---|---|
-| **Work** | Simple CLI (`argparse` or `click`) that accepts a task description, creates a Task, enqueues it, runs the orchestrator graph, and prints the result |
+| **Work** | Simple CLI (`argparse`) that accepts a task description, creates and enqueues a Task in the persistent SQLite queue, runs the Grandparent Orchestrator graph pipeline, and prints the result |
 | **Acceptance** | `python -m src.main "Qualify lead John Doe"` → task created → routed → result printed |
-| **Tests** | `test_cli.py` — CLI parsing, task creation, end-to-end smoke test with mock providers |
+| **Tests** | `test_cli.py` — CLI parsing, task creation, end-to-end execution, text & JSON formatting (13 focused tests; 334 total regression tests passing) |
 | **Dependencies** | Milestone 4.2 |
+| **Status** | **COMPLETED** |
 
 ---
 
-## Phase 5 — Concrete Providers & Task/Model Router
+## Phase 5 — Concrete Providers & Task/Model Router (NEXT)
 
 **Goal:** Multiple real LLM providers with failover, and a router that selects the cheapest suitable method.
 
-### Milestone 5.1 — Local Provider (Ollama)
+### Milestone 5.1 — Local Provider (Ollama) (NEXT)
 | Item | Detail |
 |---|---|
 | **Work** | `OllamaProvider` implementing `BaseProvider`, connects to local Ollama HTTP API, model selection, timeout handling |

@@ -291,3 +291,4 @@ def test_grandparent_non_sales_compatibility() -> None:
     delegation = task_result["delegation_result"]
     assert delegation["domain"] == "marketing"
     assert "sales_agent_result" not in delegation
+
