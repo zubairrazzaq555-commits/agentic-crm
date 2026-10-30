@@ -28,16 +28,18 @@ PROGRESS
 │   ├── 1.2 Database & Migrations     ✅  (aiosqlite, connection manager, migration runner, schemas)
 │   └── 1.3 Task Model & Queue        ✅  (Task dataclass, SQLite-backed queue, status transitions, priority)
 │
-├── Phase 2 — Providers & Router
-│   ├── 2.1 Provider Interface & Mgr  ✅  (BaseProvider ABC, ProviderManager, health/circuit breaker)
-│   ├── 2.2 Ollama Local Provider     ⏳
-│   ├── 2.3 Cloud Providers           ⏳
-│   └── 2.4 Task/Model Router         ⏳
+├── Phase 2 — Provider Infrastructure
+│   └── 2.1 Provider Interface & Mgr  ✅  (BaseProvider ABC, ProviderManager, health/circuit breaker, committed 79b3866)
 │
-├── Phase 3 — Agent Hierarchy         ⏳  (Orchestrator, Sales Agent, CLI)
-├── Phase 4 — Reliability             ⏳  (Worker, Idempotency, Audit)
-├── Phase 5 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
-└── Phase 6 — API & Scheduling        ⏳  (FastAPI, APScheduler)
+├── Phase 3 — LangGraph Foundation    ⏳  (NEXT: State -> Node -> Graph -> Edge -> Compile -> Invoke)
+│
+├── Phase 4 — Agent Hierarchy         ⏳  (Orchestrator, Sales Agent, CLI Intake)
+│
+├── Phase 5 — Concrete Providers      ⏳  (DEFERRED: Ollama, Cloud Gemini/Groq, Model Router)
+│
+├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
+├── Phase 7 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
+└── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
 **Last verified test count:** 224 tests passed (exit code 0)
@@ -57,19 +59,30 @@ PROGRESS
 
 ## Current
 
-**Active milestone:** None — between milestones.
+**Active status:** Strategic realignment complete. Ready to implement Phase 3 (LangGraph Foundation).
 
-**Last completed:** Step 2.1 (Provider Interface & Manager) — implemented and tested but **not yet committed to Git**.
+**Last completed:** Step 2.1 (Provider Interface & Manager) — committed and pushed (`79b3866`).
 
-**Immediate action needed:** Commit Step 2D provider system, then begin Step 2.2 (Ollama Local Provider) or next planned milestone.
+---
+
+## Strategic Realignment
+
+- **Previous planned next step:**
+  → Milestone 2.2: Ollama Local Provider
+- **Decision:**
+  → Deferred to Phase 5 (along with Cloud Providers and Model Router).
+- **Reason:**
+  → LangGraph foundation can be developed and validated using deterministic/fake providers without requiring live model integrations.
+- **New next milestone:**
+  → Phase 3: LangGraph Foundation (Milestone 3.1 — LangGraph Core & State Patterns)
+- **Remaining dependencies:**
+  → Add `langgraph` dependency; existing `ProviderManager` and `Task` model provide all needed substrate.
 
 ---
 
 ## Known Issues
 
 None currently.
-
-> Note: `docs/milestone_2c_report.md` is referenced in commit `899c8aa` message but the file does not exist on disk. Non-blocking — the report content is captured in the commit itself. No action required.
 
 ---
 
@@ -81,45 +94,38 @@ None currently.
 | Database | SQLite via aiosqlite | Zero-install, file-based, dev-appropriate |
 | ORM | SQLAlchemy Core (no ORM) | Type safety without overhead |
 | Async | Full asyncio | Needed for concurrent provider calls |
-| Local LLM | Ollama | Easier model management, HTTP API |
+| LangGraph | Core state-machine layer | Graph-based orchestration for orchestrator & domain agents |
+| Concrete Providers | Deferred to Phase 5 | Fake/mock providers via ProviderManager suffice for LangGraph |
 | First CRM domain | Leads | Most self-contained workflow |
 | License | MIT | Simple, permissive |
 | Cost policy | $0 ceiling | Never auto-escalate to paid APIs |
-| LangGraph | Deferred | Custom orchestration first for control |
 
 ---
 
 ## Next Step
 
-**Milestone 2.2 — Ollama Local Provider**
+**Milestone 3.1 — LangGraph Core & State Patterns**
 
-Implement `OllamaProvider` extending `BaseProvider`:
-- Connect to local Ollama HTTP API
-- Model selection, timeout handling
-- Graceful degradation when Ollama is unavailable
-- Mocked tests + optional `--run-live` flag
+Implement foundational LangGraph patterns in `src/graph/`:
+- Add `langgraph` to dependencies
+- Define TypedDict / Pydantic State schemas
+- Build core graph pattern: `State -> Node -> Graph -> Edge -> Compile -> Invoke`
+- Unit tests validating state flow and node execution
 
-Reference: `docs/roadmap.md` → Phase 2, Milestone 2.2
+Reference: `docs/roadmap.md` → Phase 3, Milestone 3.1
 
 ---
 
 ## Git State
 
 ```
-Branch:    main
-Remote:    origin/main (up to date)
-Last commit: 899c8aa  docs: add milestone 2C completion report
+Branch:      main
+Remote:      origin/main
+Last commit: 79b3866  feat: implement Step 2D provider interface and manager, add development log
 
-Uncommitted work:
-  NEW  src/providers/base.py
-  NEW  src/providers/exceptions.py
-  NEW  src/providers/health.py
-  NEW  src/providers/manager.py
-  NEW  src/providers/__init__.py
-  NEW  tests/test_provider_base.py
-  NEW  tests/test_provider_manager.py
-
-Status: Step 2.1 provider code is complete and tested but not yet committed.
+Uncommitted changes:
+  MODIFIED  docs/roadmap.md
+  MODIFIED  docs/development_log.md
 ```
 
 ---
@@ -156,5 +162,5 @@ Resolution: <one-line description>
 | 2026-10-22 | Architecture document and roadmap created |
 | 2026-10-22 | Steps 2A–2C implemented (scaffold, database, task queue) — committed as `e7568c0` |
 | 2026-10-22 | Milestone 2C report — committed as `899c8aa` |
-| 2026-10-31 | Step 2.1 Provider System implemented (BaseProvider, ProviderManager, health, circuit breaker). 224 tests passing. Not yet committed. |
-| 2026-10-31 | Development log created (`docs/development_log.md`). |
+| 2026-10-31 | Step 2.1 Provider System implemented. Committed and pushed as `79b3866`. |
+| 2026-10-31 | Strategic Roadmap Realignment: Prioritized Phase 3 LangGraph Foundation; deferred Ollama, Cloud Providers, and Model Router to Phase 5. |

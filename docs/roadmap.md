@@ -1,8 +1,33 @@
 # Agentic CRM — Development Roadmap
 
-> **Status:** Draft v0.1 · Planning phase  
-> **Last updated:** 2026-10-22  
+> **Status:** Active — Phase 1 & Step 2.1 complete, LangGraph Foundation next  
+> **Last updated:** 2026-10-31  
 > **Approach:** Incremental, MVP-first. Each phase produces tested, working software.
+
+---
+
+## Milestone Status Summary
+
+- **COMPLETED**:
+  - **Phase 1 — Project Foundation**:
+    - Milestone 1.1: Project Scaffold & Configuration ✅
+    - Milestone 1.2: Database & Migrations ✅
+    - Milestone 1.3: Task Model & Queue ✅
+  - **Phase 2 — Provider Infrastructure**:
+    - Milestone 2.1: Provider Interface & Manager ✅
+- **CURRENT**:
+  - Strategic realignment & preparation for LangGraph Foundation
+- **NEXT**:
+  - **Phase 3 — LangGraph Foundation**:
+    - State -> Node -> Graph -> Edge -> Compile -> Invoke core execution patterns
+    - Sequential execution, conditional routing, parallel execution, loops
+    - Validated with deterministic & test providers via existing `ProviderManager`
+- **FUTURE (Re-sequenced)**:
+  - **Phase 4 — Agent Hierarchy**: Orchestrator, Domain Agents, CLI Intake (built on LangGraph)
+  - **Phase 5 — Concrete Providers & Model Router**: Ollama, Gemini, Groq, Model Router (deferred; to be plugged into the LangGraph execution layer)
+  - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
+  - **Phase 7 — First CRM Feature**: Leads CRUD, rule-based scoring, Sales Agent integration
+  - **Phase 8 — API & Scheduling**: FastAPI REST layer, APScheduler
 
 ---
 
@@ -14,35 +39,29 @@ gantt
     dateFormat  YYYY-MM-DD
     axisFormat  %b %d
 
-    section Phase 1 — Foundation
-    Project scaffold & config       :p1a, 2026-10-22, 2d
-    Database & migrations           :p1b, after p1a, 2d
-    Task model & queue              :p1c, after p1b, 3d
+    section Phase 1 — Foundation (DONE)
+    Scaffold, DB, Task Queue        :done, p1, 2026-10-22, 2026-10-22
 
-    section Phase 2 — Providers & Router
-    Provider interface & manager    :p2a, after p1c, 3d
-    Ollama local provider           :p2b, after p2a, 2d
-    Cloud providers (Gemini, Groq)  :p2c, after p2a, 3d
-    Task/Model router               :p2d, after p2b, 3d
+    section Phase 2 — Provider Base (DONE)
+    Provider interface & manager    :done, p2a, 2026-10-31, 2026-10-31
 
-    section Phase 3 — Hierarchy
-    Grandparent orchestrator        :p3a, after p2d, 3d
-    Sales domain agent (stub)       :p3b, after p3a, 2d
-    CLI intake layer                :p3c, after p3b, 2d
+    section Phase 3 — LangGraph Foundation (NEXT)
+    LangGraph State & Core Patterns :active, p3, 2026-10-31, 3d
 
-    section Phase 4 — Reliability
-    Worker loop & recovery          :p4a, after p3c, 3d
-    Idempotency & dedup             :p4b, after p4a, 2d
-    Audit logging                   :p4c, after p4b, 2d
+    section Phase 4 — Agent Hierarchy
+    Orchestrator & Domain Agents    :p4, after p3, 5d
 
-    section Phase 5 — First CRM Feature
-    Leads module (CRUD)             :p5a, after p4c, 3d
-    Lead scoring (rules)            :p5b, after p5a, 2d
-    Sales agent + leads integration :p5c, after p5b, 3d
+    section Phase 5 — Providers & Router
+    Ollama, Cloud, Model Router     :p5, after p4, 5d
 
-    section Phase 6 — API & Scheduling
-    FastAPI REST layer              :p6a, after p5c, 3d
-    APScheduler integration         :p6b, after p6a, 2d
+    section Phase 6 — Reliability
+    Worker, Idempotency, Audit      :p6, after p5, 5d
+
+    section Phase 7 — CRM Leads
+    Leads CRUD, Scoring, Integration:p7, after p6, 5d
+
+    section Phase 8 — API & Scheduling
+    FastAPI & APScheduler           :p8, after p7, 5d
 ```
 
 ---
@@ -77,19 +96,89 @@ gantt
 
 ---
 
-## Phase 2 — Providers & Task/Model Router
+## Phase 2 — Provider Infrastructure
 
-**Goal:** Multiple LLM providers with failover, and a router that selects the cheapest suitable method.
+**Goal:** Establish provider abstraction, registry, health tracking, and circuit breakers.
 
-### Milestone 2.1 — Provider Interface & Manager
+### Milestone 2.1 — Provider Interface & Manager ✅
 | Item | Detail |
 |---|---|
 | **Work** | `BaseProvider` ABC (common interface: `generate()`, `health_check()`, `get_quota()`), `ProviderManager` (registry, health tracking, circuit breaker, rate-limit backoff), `is_paid` flag enforcement |
 | **Acceptance** | Providers can be registered, health-checked; paid providers are never auto-selected; circuit breaker triggers after N failures |
-| **Tests** | `test_provider_base.py`, `test_provider_manager.py` — mock providers, paid-rejection, circuit breaker, fallback ordering |
+| **Tests** | `test_provider_base.py`, `test_provider_manager.py` — mock providers, paid-rejection, circuit breaker, fallback ordering (224 tests passing) |
 | **Dependencies** | Milestone 1.3 |
+| **Status** | **COMPLETED** (Commit `79b3866`) |
 
-### Milestone 2.2 — Local Provider (Ollama)
+> **Strategic Realignment Note:** Milestones 2.2 (Ollama), 2.3 (Cloud Providers), and 2.4 (Model Router) are deferred to **Phase 5**. The existing `ProviderManager` and `BaseProvider` ABC provide sufficient mock/test support to build and validate the LangGraph orchestration layer without needing live LLM APIs.
+
+---
+
+## Phase 3 — LangGraph Foundation (NEXT)
+
+**Goal:** Establish state-machine graph orchestration patterns using LangGraph before building domain agents.
+
+### Milestone 3.1 — LangGraph Core & State Patterns
+| Item | Detail |
+|---|---|
+| **Work** | Add `langgraph` dependency; define typed State schemas; build core execution pattern: `State -> Node -> Graph -> Edge -> Compile -> Invoke` |
+| **Acceptance** | Basic graph compiles, accepts state input, executes sequential nodes deterministically, returns modified state |
+| **Tests** | `tests/test_graph_core.py` — state schema validation, node execution, state transitions, compilation |
+| **Dependencies** | Milestone 2.1 |
+| **Status** | **NEXT MILESTONE** |
+
+### Milestone 3.2 — Execution Topologies (Branching, Loops & Parallel)
+| Item | Detail |
+|---|---|
+| **Work** | Implement conditional routing edges, iterative loops with termination conditions, and parallel node execution patterns in LangGraph |
+| **Acceptance** | Graphs dynamically route based on state predicates; loops terminate safely; parallel branches aggregate state cleanly |
+| **Tests** | `tests/test_graph_topologies.py` — conditional routing, cycle detection/termination, parallel fan-out/fan-in |
+| **Dependencies** | Milestone 3.1 |
+
+### Milestone 3.3 — Provider & Task Integration
+| Item | Detail |
+|---|---|
+| **Work** | Integrate graph execution with existing `ProviderManager` (using mock/fake providers) and CRM `Task` data models |
+| **Acceptance** | Graph nodes invoke provider abstractions via `ProviderManager`; task state maps to/from LangGraph state |
+| **Tests** | `tests/test_graph_provider_integration.py` — graph invocation with fake provider, task lifecycle mapping |
+| **Dependencies** | Milestone 3.2 |
+
+---
+
+## Phase 4 — Agent Hierarchy
+
+**Goal:** Working orchestrator → domain agent → tool chain implemented via LangGraph.
+
+### Milestone 4.1 — Grandparent Orchestrator
+| Item | Detail |
+|---|---|
+| **Work** | Orchestrator graph: receives tasks from queue, classifies domain (rule-based initially), delegates to registered domain agent sub-graphs, tracks lifecycle, handles top-level errors |
+| **Acceptance** | Orchestrator correctly routes a "sales" task to the Sales Agent sub-graph and an unknown task to an error handler |
+| **Tests** | `test_orchestrator.py` — routing, unknown domain handling, lifecycle tracking |
+| **Dependencies** | Phase 3 (LangGraph Foundation) |
+
+### Milestone 4.2 — Sales Domain Agent (Stub)
+| Item | Detail |
+|---|---|
+| **Work** | `SalesAgent` sub-graph: receives delegated tasks, decomposes into sub-tasks, calls tools or provider interfaces, aggregates results |
+| **Acceptance** | Sales Agent receives a task, executes a simple tool (e.g., echo), returns structured result to orchestrator |
+| **Tests** | `test_sales_agent.py` — task decomposition, tool execution, result aggregation |
+| **Dependencies** | Milestone 4.1 |
+
+### Milestone 4.3 — CLI Intake Layer
+| Item | Detail |
+|---|---|
+| **Work** | Simple CLI (`argparse` or `click`) that accepts a task description, creates a Task, enqueues it, runs the orchestrator graph, and prints the result |
+| **Acceptance** | `python -m src.main "Qualify lead John Doe"` → task created → routed → result printed |
+| **Tests** | `test_cli.py` — CLI parsing, task creation, end-to-end smoke test with mock providers |
+| **Dependencies** | Milestone 4.2 |
+
+---
+
+## Phase 5 — Concrete Providers & Task/Model Router
+
+**Goal:** Multiple real LLM providers with failover, and a router that selects the cheapest suitable method.
+
+### Milestone 5.1 — Local Provider (Ollama)
 | Item | Detail |
 |---|---|
 | **Work** | `OllamaProvider` implementing `BaseProvider`, connects to local Ollama HTTP API, model selection, timeout handling |
@@ -97,7 +186,7 @@ gantt
 | **Tests** | `test_ollama_provider.py` — mocked HTTP responses for success, timeout, unavailable; optional live test with `--run-live` |
 | **Dependencies** | Milestone 2.1 |
 
-### Milestone 2.3 — Cloud Providers (Gemini, Groq)
+### Milestone 5.2 — Cloud Providers (Gemini, Groq)
 | Item | Detail |
 |---|---|
 | **Work** | `GeminiProvider`, `GroqProvider` implementing `BaseProvider`, API key from env, quota tracking from response headers, rate-limit detection |
@@ -105,125 +194,95 @@ gantt
 | **Tests** | Mocked tests for success, rate-limit (429), quota exhaustion, auth failure; optional live tests |
 | **Dependencies** | Milestone 2.1 |
 
-### Milestone 2.4 — Task/Model Router
+### Milestone 5.3 — Task/Model Router
 | Item | Detail |
 |---|---|
 | **Work** | `ModelRouter` with capability levels (DETERMINISTIC, ML, LOCAL_SLM, CLOUD_LLM, CLOUD_LLM_CAPABLE), routing logic that queries `ProviderManager` for availability, fallback chain, strict no-paid policy |
 | **Acceptance** | Router selects lowest-cost available method; falls back correctly when providers are down; never selects a paid provider; deterministic tasks bypass LLM entirely |
 | **Tests** | `test_model_router.py` — routing decisions with various provider availability scenarios, capability matching, paid-provider rejection |
-| **Dependencies** | Milestones 2.1–2.3 |
+| **Dependencies** | Milestones 5.1–5.2 |
 
 ---
 
-## Phase 3 — Agent Hierarchy
-
-**Goal:** Working orchestrator → domain agent → tool chain.
-
-### Milestone 3.1 — Grandparent Orchestrator
-| Item | Detail |
-|---|---|
-| **Work** | `Orchestrator` class: receives tasks from queue, classifies domain (rule-based initially), delegates to registered domain agents, tracks lifecycle, handles top-level errors |
-| **Acceptance** | Orchestrator correctly routes a "sales" task to the Sales Agent stub and an unknown task to an error handler |
-| **Tests** | `test_orchestrator.py` — routing, unknown domain handling, lifecycle tracking |
-| **Dependencies** | Milestone 2.4 |
-
-### Milestone 3.2 — Sales Domain Agent (Stub)
-| Item | Detail |
-|---|---|
-| **Work** | `SalesAgent` class: receives delegated tasks, decomposes into sub-tasks (hardcoded initially), calls tools or router, aggregates results |
-| **Acceptance** | Sales Agent receives a task, executes a simple tool (e.g., echo), returns structured result to orchestrator |
-| **Tests** | `test_sales_agent.py` — task decomposition, tool execution, result aggregation |
-| **Dependencies** | Milestone 3.1 |
-
-### Milestone 3.3 — CLI Intake Layer
-| Item | Detail |
-|---|---|
-| **Work** | Simple CLI (`argparse` or `click`) that accepts a task description, creates a Task, enqueues it, runs the orchestrator, and prints the result |
-| **Acceptance** | `python -m src.main "Qualify lead John Doe"` → task created → routed → result printed |
-| **Tests** | `test_cli.py` — CLI parsing, task creation, end-to-end smoke test with mock providers |
-| **Dependencies** | Milestone 3.2 |
-
----
-
-## Phase 4 — Reliability & Recovery
+## Phase 6 — Reliability & Recovery
 
 **Goal:** The system can survive crashes, retries, and provider outages without data loss or duplicate actions.
 
-### Milestone 4.1 — Worker Loop & Recovery
+### Milestone 6.1 — Worker Loop & Recovery
 | Item | Detail |
 |---|---|
 | **Work** | Async worker loop that polls the task queue, processes tasks via orchestrator, handles timeouts, requeues stale `IN_PROGRESS` tasks on startup |
 | **Acceptance** | Worker processes queued tasks; simulated crash → restart → stale tasks are requeued and reprocessed |
 | **Tests** | `test_worker.py` — processing, timeout, restart recovery |
-| **Dependencies** | Milestone 3.3 |
+| **Dependencies** | Milestone 4.3 |
 
-### Milestone 4.2 — Idempotency & Deduplication
+### Milestone 6.2 — Idempotency & Deduplication
 | Item | Detail |
 |---|---|
 | **Work** | Idempotency key generation per task, dedup check before side-effecting actions, idempotency record table |
 | **Acceptance** | Replaying a task with the same idempotency key does not produce duplicate side effects |
 | **Tests** | `test_idempotency.py` — duplicate detection, key generation, replay safety |
-| **Dependencies** | Milestone 4.1 |
+| **Dependencies** | Milestone 6.1 |
 
-### Milestone 4.3 — Audit Logging
+### Milestone 6.3 — Audit Logging
 | Item | Detail |
 |---|---|
 | **Work** | Structured audit log (who/what/when/why) for all agent decisions, provider calls, and task state changes |
 | **Acceptance** | Every task execution produces a traceable audit trail in the database |
 | **Tests** | `test_audit.py` — log creation, queryability, completeness |
-| **Dependencies** | Milestone 4.2 |
+| **Dependencies** | Milestone 6.2 |
 
 ---
 
-## Phase 5 — First CRM Feature: Leads
+## Phase 7 — First CRM Feature: Leads
 
 **Goal:** A real CRM capability — managing and scoring leads — wired through the full agent hierarchy.
 
-### Milestone 5.1 — Leads Module (CRUD)
+### Milestone 7.1 — Leads Module (CRUD)
 | Item | Detail |
 |---|---|
 | **Work** | `Lead` model (name, email, company, source, status, score, notes, timestamps), CRUD service, database table and migration |
 | **Acceptance** | Leads can be created, read, updated, deleted, listed with filters |
 | **Tests** | `test_leads_crud.py` — full CRUD, validation, filtering |
-| **Dependencies** | Milestone 4.3 |
+| **Dependencies** | Milestone 6.3 |
 
-### Milestone 5.2 — Lead Scoring (Rules-Based)
+### Milestone 7.2 — Lead Scoring (Rules-Based)
 | Item | Detail |
 |---|---|
 | **Work** | Rule-based lead scoring engine (configurable criteria: company size, source, engagement), score calculation, score persistence |
 | **Acceptance** | New or updated leads get a score; scoring rules can be configured without code changes |
 | **Tests** | `test_lead_scoring.py` — various lead profiles, edge cases, config changes |
-| **Dependencies** | Milestone 5.1 |
+| **Dependencies** | Milestone 7.1 |
 
-### Milestone 5.3 — Sales Agent + Leads Integration
+### Milestone 7.3 — Sales Agent + Leads Integration
 | Item | Detail |
 |---|---|
 | **Work** | Wire Sales Agent to use Leads tools (create, score, qualify), orchestrator routes lead-related tasks to Sales Agent, optional LLM-powered lead summary |
 | **Acceptance** | `"Create lead: John Doe, ACME Corp"` → Lead created, scored, result returned via CLI |
 | **Tests** | `test_sales_leads_integration.py` — end-to-end with mock providers |
-| **Dependencies** | Milestones 5.1, 5.2, 3.2 |
+| **Dependencies** | Milestones 7.1, 7.2, 4.2 |
 
 ---
 
-## Phase 6 — API & Scheduling (Future)
+## Phase 8 — API & Scheduling (Future)
 
 **Goal:** External access and time-based automation.
 
-### Milestone 6.1 — FastAPI REST Layer
+### Milestone 8.1 — FastAPI REST Layer
 | Item | Detail |
 |---|---|
 | **Work** | REST endpoints for tasks and leads, OpenAPI documentation, async handlers |
 | **Acceptance** | CRUD operations via HTTP, Swagger UI accessible |
 | **Tests** | `test_api.py` — endpoint tests with `httpx` |
-| **Dependencies** | Phase 5 |
+| **Dependencies** | Phase 7 |
 
-### Milestone 6.2 — Scheduled Tasks
+### Milestone 8.2 — Scheduled Tasks
 | Item | Detail |
 |---|---|
 | **Work** | APScheduler integration, cron-style task definitions, scheduled lead re-scoring |
 | **Acceptance** | A scheduled task runs at defined intervals; missed schedules are caught up on restart |
 | **Tests** | `test_scheduler.py` — scheduling, execution, recovery |
-| **Dependencies** | Milestone 6.1 |
+| **Dependencies** | Milestone 8.1 |
 
 ---
 
@@ -258,23 +317,19 @@ gantt
 
 ---
 
-## Step 2 Recommendation
+## Next Implementation Milestone: Phase 3 — LangGraph Foundation
 
-**The next implementation step should be Phase 1 — Project Foundation (Milestones 1.1–1.3):**
+**The next implementation step is Phase 3 — LangGraph Foundation (Milestones 3.1–3.3):**
 
-1. **Milestone 1.1:** Create the project scaffold — `pyproject.toml`, directory structure, `.gitignore`, `.env.example`, `README.md`, `config.py`.
-2. **Milestone 1.2:** Set up SQLite database with connection manager and initial migration.
-3. **Milestone 1.3:** Implement the Task model and SQLite-backed task queue.
+1. **Milestone 3.1:** LangGraph Core & State Patterns (`State -> Node -> Graph -> Edge -> Compile -> Invoke`).
+2. **Milestone 3.2:** Execution Topologies (Conditional routing, iterative loops, parallel branches).
+3. **Milestone 3.3:** Provider & Task Integration (Wiring graph nodes with `ProviderManager` via test/mock providers and mapping to `Task` lifecycle).
 
-**Why start here:**
-- These are pure infrastructure with no external dependencies or API keys.
-- They provide the foundation every later component builds on.
-- They are fully testable locally without any cloud services.
-- They establish the project structure, testing patterns, and development workflow.
-
-**Prerequisite from you:**
-- Confirm the architecture decisions in Section 11 of `architecture.md` (Python version, SQLAlchemy vs raw SQL, async, Ollama, Leads-first, license).
-- Provide your GitHub repository URL when ready (no rush — code can be prepared locally first).
+**Why prioritize this next:**
+- Establishes the graph state-machine orchestration engine before building high-level domain agents.
+- Can be completely tested and verified with deterministic code and fake providers ($0 cost, 100% test reliability).
+- Does not block on external LLM services (Ollama or cloud APIs).
+- Concrete providers and Model Router can easily be plugged into graph nodes once the orchestration patterns are proven.
 
 ---
 
