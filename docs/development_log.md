@@ -60,19 +60,20 @@ PROGRESS
 | 3.1 LangGraph Core | LangGraph dependency, typed BasicState, deterministic nodes, sequential graph flow: START -> node_one -> node_two -> END | `src/graph/state.py`, `src/graph/basic_graph.py`, `src/graph/__init__.py` | `tests/test_langgraph_basic.py` (5 tests) |
 | 3.2 Execution Topologies | Conditional branching (`add_conditional_edges`), iterative loops with max safety ceiling, parallel branches with `operator.add` fan-in | `src/graph/conditional_graph.py`, `src/graph/loop_graph.py`, `src/graph/parallel_graph.py` | `tests/test_langgraph_topologies.py` (7 tests) |
 | 3.3 Provider & Task Integration | Task-to-Graph mapping, ProviderManager async invocation, MockProvider, TaskExecutor lifecycle (PENDING -> RUNNING -> COMPLETED/FAILED) | `src/providers/mock_provider.py`, `src/graph/task_state.py`, `src/graph/task_graph.py`, `src/core/task_executor.py` | `tests/test_task_graph.py`, `tests/test_task_executor.py` (9 tests) |
+| 4.1 Grandparent Orchestrator | Hierarchical top-level dispatcher: OrchestratorState schema, deterministic rule-based domain classifier, decoupled domain handler nodes (sales, marketing, customer_service, data, unknown), compiled LangGraph StateGraph, sync/async GrandparentOrchestrator | `src/agents/orchestrator/state.py`, `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/handlers.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/__init__.py` | `tests/test_orchestrator.py` (37 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 3.3 complete. Phase 3 (LangGraph Foundation) complete. Preparing for Phase 4 (Agent Hierarchy).
+**Active milestone:** Milestone 4.1 complete. Preparing for Milestone 4.2 (Sales Domain Agent Stub).
 
-**Milestone 3.3 Status:** COMPLETE
-- Implemented **MockProvider** (`src/providers/mock_provider.py`) implementing `BaseProvider` contract deterministically with failure simulation.
-- Implemented **Task-to-Graph State Mapping** (`src/graph/task_state.py`) converting task records into `TaskExecutionState` and extracting results.
-- Implemented **Task Execution Graph** (`src/graph/task_graph.py`) with async execution node, explicit provider lookup via `ProviderManager`, and circuit breaker recording.
-- Implemented **TaskExecutor** (`src/core/task_executor.py`) coordinating database lifecycle transitions (`PENDING -> RUNNING -> COMPLETED` or `FAILED`) keeping DB persistence isolated from graph nodes.
-- Tested: 9 focused integration tests passing; 245 total regression tests passing (exit code 0).
+**Milestone 4.1 Status:** COMPLETE
+- Implemented **OrchestratorState** (`src/agents/orchestrator/state.py`) TypedDict schema with task tracking, domain classification, execution status, and delegation payload.
+- Implemented **Domain Classifier** (`src/agents/orchestrator/classifier.py`) deterministic multi-layer tokenization and keyword scoring for `sales`, `marketing`, `customer_service`, `data`, and fallback `unknown`.
+- Implemented **Decoupled Domain Handlers** (`src/agents/orchestrator/handlers.py`) placeholder dispatchers for all supported domains plus unknown fallback handler.
+- Implemented **Grandparent Orchestrator Graph & Class** (`src/agents/orchestrator/orchestrator.py`) StateGraph with conditional edges and sync `execute()` / async `aexecute()` invocation.
+- Tested: 37 focused orchestrator tests passing; 282 total regression tests passing (exit code 0).
 
 ---
 

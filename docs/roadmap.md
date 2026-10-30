@@ -151,19 +151,20 @@ gantt
 
 ---
 
-## Phase 4 — Agent Hierarchy (NEXT)
+## Phase 4 — Agent Hierarchy
 
 **Goal:** Working orchestrator → domain agent → tool chain implemented via LangGraph.
 
-### Milestone 4.1 — Grandparent Orchestrator
+### Milestone 4.1 — Grandparent Orchestrator ✅
 | Item | Detail |
 |---|---|
-| **Work** | Orchestrator graph: receives tasks from queue, classifies domain (rule-based initially), delegates to registered domain agent sub-graphs, tracks lifecycle, handles top-level errors |
-| **Acceptance** | Orchestrator correctly routes a "sales" task to the Sales Agent sub-graph and an unknown task to an error handler |
-| **Tests** | `test_orchestrator.py` — routing, unknown domain handling, lifecycle tracking |
+| **Work** | Orchestrator graph: receives tasks from queue, classifies domain (rule-based deterministic classifier), delegates to decoupled domain handlers (sales, marketing, customer_service, data, unknown), tracks lifecycle, handles fallback |
+| **Acceptance** | Orchestrator correctly routes tasks to their designated domain handler and unknown tasks to general fallback handler |
+| **Tests** | `test_orchestrator.py` — classification, routing, domain handlers, GrandparentOrchestrator sync and async execution (37 focused tests; 282 total regression tests passing) |
 | **Dependencies** | Phase 3 (LangGraph Foundation) |
+| **Status** | **COMPLETED** |
 
-### Milestone 4.2 — Sales Domain Agent (Stub)
+### Milestone 4.2 — Sales Domain Agent (Stub) (NEXT)
 | Item | Detail |
 |---|---|
 | **Work** | `SalesAgent` sub-graph: receives delegated tasks, decomposes into sub-tasks, calls tools or provider interfaces, aggregates results |
