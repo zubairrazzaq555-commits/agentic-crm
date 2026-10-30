@@ -164,15 +164,16 @@ gantt
 | **Dependencies** | Phase 3 (LangGraph Foundation) |
 | **Status** | **COMPLETED** |
 
-### Milestone 4.2 — Sales Domain Agent (Stub) (NEXT)
+### Milestone 4.2 — Sales Domain Agent Foundation ✅
 | Item | Detail |
 |---|---|
-| **Work** | `SalesAgent` sub-graph: receives delegated tasks, decomposes into sub-tasks, calls tools or provider interfaces, aggregates results |
-| **Acceptance** | Sales Agent receives a task, executes a simple tool (e.g., echo), returns structured result to orchestrator |
-| **Tests** | `test_sales_agent.py` — task decomposition, tool execution, result aggregation |
+| **Work** | `SalesDomainAgent` sub-graph: receives delegated sales tasks from Grandparent Orchestrator, classifies sales subdomain (`lead_management`, `opportunity_management`, `deal_management`, `general_sales`), executes decoupled subdomain handlers, aggregates results |
+| **Acceptance** | Sales Agent receives task, routes to designated subdomain handler, returns structured result to orchestrator; Grandparent Orchestrator integrates delegation seamlessly |
+| **Tests** | `test_sales_agent.py` — classification, subdomain routing, handler execution, Grandparent integration (39 focused tests; 321 total regression tests passing) |
 | **Dependencies** | Milestone 4.1 |
+| **Status** | **COMPLETED** |
 
-### Milestone 4.3 — CLI Intake Layer
+### Milestone 4.3 — CLI Intake Layer (NEXT)
 | Item | Detail |
 |---|---|
 | **Work** | Simple CLI (`argparse` or `click`) that accepts a task description, creates a Task, enqueues it, runs the orchestrator graph, and prints the result |

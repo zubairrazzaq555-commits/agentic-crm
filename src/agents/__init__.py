@@ -1,4 +1,4 @@
-"""Agent orchestration package."""
+"""Agent orchestration and domain agents package."""
 
 from src.agents.orchestrator import (
     DOMAIN_KEYWORDS,
@@ -16,8 +16,24 @@ from src.agents.orchestrator import (
     sales_handler_node,
     unknown_handler_node,
 )
+from src.agents.sales import (
+    SALES_CATEGORY_KEYWORDS,
+    SUPPORTED_SALES_CATEGORIES,
+    SalesAgentState,
+    SalesDomainAgent,
+    classify_sales_task,
+    create_initial_sales_state,
+    create_sales_agent_graph,
+    deal_management_handler,
+    general_sales_handler,
+    lead_management_handler,
+    opportunity_management_handler,
+    route_sales_category,
+    sales_classifier_node,
+)
 
 __all__ = [
+    # Grandparent Orchestrator
     "DOMAIN_KEYWORDS",
     "GrandparentOrchestrator",
     "OrchestratorState",
@@ -32,4 +48,18 @@ __all__ = [
     "route_domain",
     "sales_handler_node",
     "unknown_handler_node",
+    # Sales Domain Agent
+    "SALES_CATEGORY_KEYWORDS",
+    "SUPPORTED_SALES_CATEGORIES",
+    "SalesAgentState",
+    "SalesDomainAgent",
+    "classify_sales_task",
+    "create_initial_sales_state",
+    "create_sales_agent_graph",
+    "deal_management_handler",
+    "general_sales_handler",
+    "lead_management_handler",
+    "opportunity_management_handler",
+    "route_sales_category",
+    "sales_classifier_node",
 ]

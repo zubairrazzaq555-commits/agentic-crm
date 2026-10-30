@@ -5,9 +5,10 @@ In future milestones (e.g. Phase 4.2+), these can delegate to dedicated
 sub-graphs or domain agent workers.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from src.agents.orchestrator.state import OrchestratorState
+from src.agents.sales.agent import SalesDomainAgent
 
 
 def _build_delegation_payload(
@@ -29,9 +30,18 @@ def _build_delegation_payload(
     }
 
 
-def sales_handler_node(state: OrchestratorState) -> Dict[str, Any]:
-    """Domain Handler: Dispatches sales tasks (leads, deals, quotes, pipeline)."""
+def sales_handler_node(
+    state: OrchestratorState,
+    sales_agent: Optional[SalesDomainAgent] = None,
+) -> Dict[str, Any]:
+    """Domain Handler: Dispatches sales tasks to the Sales Domain Agent."""
     step = state.get("step", 0)
+    agent = sales_agent or SalesDomainAgent()
+    sales_result = agent.execute(
+        task_id=state.get("task_id", ""),
+        task_type=state.get("task_type", ""),
+        input_payload=state.get("input_payload", {}),
+    )
     delegation = _build_delegation_payload(
         domain="sales",
         handler_name="sales_handler_node",
@@ -39,6 +49,7 @@ def sales_handler_node(state: OrchestratorState) -> Dict[str, Any]:
         state=state,
         details="Task successfully delegated to Sales Agent.",
     )
+    delegation["sales_agent_result"] = sales_result
     return {
         "execution_status": "SUCCESS",
         "delegation_result": delegation,
@@ -112,3 +123,4 @@ def unknown_handler_node(state: OrchestratorState) -> Dict[str, Any]:
         "delegation_result": delegation,
         "step": step + 1,
     }
+

@@ -61,19 +61,21 @@ PROGRESS
 | 3.2 Execution Topologies | Conditional branching (`add_conditional_edges`), iterative loops with max safety ceiling, parallel branches with `operator.add` fan-in | `src/graph/conditional_graph.py`, `src/graph/loop_graph.py`, `src/graph/parallel_graph.py` | `tests/test_langgraph_topologies.py` (7 tests) |
 | 3.3 Provider & Task Integration | Task-to-Graph mapping, ProviderManager async invocation, MockProvider, TaskExecutor lifecycle (PENDING -> RUNNING -> COMPLETED/FAILED) | `src/providers/mock_provider.py`, `src/graph/task_state.py`, `src/graph/task_graph.py`, `src/core/task_executor.py` | `tests/test_task_graph.py`, `tests/test_task_executor.py` (9 tests) |
 | 4.1 Grandparent Orchestrator | Hierarchical top-level dispatcher: OrchestratorState schema, deterministic rule-based domain classifier, decoupled domain handler nodes (sales, marketing, customer_service, data, unknown), compiled LangGraph StateGraph, sync/async GrandparentOrchestrator | `src/agents/orchestrator/state.py`, `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/handlers.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/__init__.py` | `tests/test_orchestrator.py` (37 tests) |
+| 4.2 Sales Domain Agent Foundation | SalesAgentState schema, deterministic sales subdomain classifier (`lead_management`, `opportunity_management`, `deal_management`, `general_sales`), decoupled subdomain handlers, compiled LangGraph StateGraph, sync/async SalesDomainAgent, Grandparent Orchestrator integration | `src/agents/sales/state.py`, `src/agents/sales/classifier.py`, `src/agents/sales/handlers.py`, `src/agents/sales/agent.py`, `src/agents/sales/__init__.py`, `src/agents/__init__.py` | `tests/test_sales_agent.py` (39 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 4.1 complete. Preparing for Milestone 4.2 (Sales Domain Agent Stub).
+**Active milestone:** Milestone 4.2 complete. Preparing for Milestone 4.3 (CLI Intake Layer).
 
-**Milestone 4.1 Status:** COMPLETE
-- Implemented **OrchestratorState** (`src/agents/orchestrator/state.py`) TypedDict schema with task tracking, domain classification, execution status, and delegation payload.
-- Implemented **Domain Classifier** (`src/agents/orchestrator/classifier.py`) deterministic multi-layer tokenization and keyword scoring for `sales`, `marketing`, `customer_service`, `data`, and fallback `unknown`.
-- Implemented **Decoupled Domain Handlers** (`src/agents/orchestrator/handlers.py`) placeholder dispatchers for all supported domains plus unknown fallback handler.
-- Implemented **Grandparent Orchestrator Graph & Class** (`src/agents/orchestrator/orchestrator.py`) StateGraph with conditional edges and sync `execute()` / async `aexecute()` invocation.
-- Tested: 37 focused orchestrator tests passing; 282 total regression tests passing (exit code 0).
+**Milestone 4.2 Status:** COMPLETE
+- Implemented **SalesAgentState** (`src/agents/sales/state.py`) TypedDict schema with task tracking, sales subdomain classification, execution status, and handler result.
+- Implemented **Sales Task Classifier** (`src/agents/sales/classifier.py`) deterministic multi-layer tokenization, prefix matching, keyword scoring, and specialized category prioritization (`lead_management`, `opportunity_management`, `deal_management`, fallback to `general_sales`).
+- Implemented **Decoupled Sales Handlers** (`src/agents/sales/handlers.py`) placeholder handlers for Lead Management, Opportunity Management, Deal Management, and General Sales.
+- Implemented **Sales Domain Graph & Class** (`src/agents/sales/agent.py`) StateGraph with conditional edges and sync `execute()` / async `aexecute()` invocation.
+- Implemented **Grandparent Orchestrator Integration** (`src/agents/orchestrator/handlers.py`) routing sales tasks into `SalesDomainAgent` with nested execution result reporting while preserving backward compatibility.
+- Tested: 39 focused sales agent tests passing; 321 total regression tests passing (exit code 0).
 
 ---
 
