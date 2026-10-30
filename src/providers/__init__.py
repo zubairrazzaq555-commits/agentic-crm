@@ -13,12 +13,14 @@ from src.providers.exceptions import (
 )
 from src.providers.health import CircuitBreaker, CircuitState, HealthStatus
 from src.providers.manager import ProviderManager
+from src.providers.mock_provider import MockProvider
 
 __all__ = [
     "BaseProvider",
     "CircuitBreaker",
     "CircuitState",
     "HealthStatus",
+    "MockProvider",
     "PaidProviderError",
     "ProviderError",
     "ProviderManager",

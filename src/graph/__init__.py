@@ -44,6 +44,12 @@ from src.graph.state import (
     LoopState,
     ParallelState,
 )
+from src.graph.task_graph import create_task_graph
+from src.graph.task_state import (
+    TaskExecutionState,
+    graph_state_to_task_result,
+    task_to_graph_state,
+)
 
 __all__ = [
     # States
@@ -51,6 +57,7 @@ __all__ = [
     "ConditionalState",
     "LoopState",
     "ParallelState",
+    "TaskExecutionState",
     # Basic sequential
     "create_basic_graph",
     "node_one",
@@ -78,4 +85,8 @@ __all__ = [
     "branch_category",
     "aggregator_node",
     "run_parallel_graph",
+    # Task integration
+    "create_task_graph",
+    "task_to_graph_state",
+    "graph_state_to_task_result",
 ]

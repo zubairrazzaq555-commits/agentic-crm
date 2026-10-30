@@ -1,6 +1,6 @@
 # Agentic CRM — Development Roadmap
 
-> **Status:** Active — Phase 1 & Step 2.1 complete, LangGraph Foundation next  
+> **Status:** Active — Phases 1, 2 (partial), & 3 complete, Phase 4 (Agent Hierarchy) next  
 > **Last updated:** 2026-10-31  
 > **Approach:** Incremental, MVP-first. Each phase produces tested, working software.
 
@@ -15,16 +15,19 @@
     - Milestone 1.3: Task Model & Queue ✅
   - **Phase 2 — Provider Infrastructure**:
     - Milestone 2.1: Provider Interface & Manager ✅
-- **CURRENT**:
-  - Strategic realignment & preparation for LangGraph Foundation
-- **NEXT**:
   - **Phase 3 — LangGraph Foundation**:
-    - State -> Node -> Graph -> Edge -> Compile -> Invoke core execution patterns
-    - Sequential execution, conditional routing, parallel execution, loops
-    - Validated with deterministic & test providers via existing `ProviderManager`
+    - Milestone 3.1: LangGraph Core & State Patterns ✅
+    - Milestone 3.2: Execution Topologies (Branching, Loops, Parallel) ✅
+    - Milestone 3.3: Provider & Task Integration ✅
+- **CURRENT**:
+  - Phase 3 complete. Preparing for Phase 4 (Agent Hierarchy).
+- **NEXT**:
+  - **Phase 4 — Agent Hierarchy**:
+    - Milestone 4.1: Grandparent Orchestrator Graph
+    - Milestone 4.2: Sales Domain Agent Sub-Graph (Stub)
+    - Milestone 4.3: CLI Intake Layer
 - **FUTURE (Re-sequenced)**:
-  - **Phase 4 — Agent Hierarchy**: Orchestrator, Domain Agents, CLI Intake (built on LangGraph)
-  - **Phase 5 — Concrete Providers & Model Router**: Ollama, Gemini, Groq, Model Router (deferred; to be plugged into the LangGraph execution layer)
+  - **Phase 5 — Concrete Providers & Model Router**: Ollama, Gemini, Groq, Model Router (to be plugged into the LangGraph execution layer)
   - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
   - **Phase 7 — First CRM Feature**: Leads CRUD, rule-based scoring, Sales Agent integration
   - **Phase 8 — API & Scheduling**: FastAPI REST layer, APScheduler
@@ -45,8 +48,11 @@ gantt
     section Phase 2 — Provider Base (DONE)
     Provider interface & manager    :done, p2a, 2026-10-31, 2026-10-31
 
-    section Phase 3 — LangGraph Foundation (NEXT)
-    LangGraph State & Core Patterns :active, p3, 2026-10-31, 3d
+    section Phase 3 — LangGraph (DONE)
+    Core, Topologies, Integration   :done, p3, 2026-10-31, 2026-10-31
+
+    section Phase 4 — Agent Hierarchy (NEXT)
+    Orchestrator & Domain Agents    :active, p4, 2026-10-31, 5d
 
     section Phase 4 — Agent Hierarchy
     Orchestrator & Domain Agents    :p4, after p3, 5d
@@ -134,17 +140,18 @@ gantt
 | **Tests** | `tests/test_graph_topologies.py` — conditional routing, cycle detection/termination, parallel fan-out/fan-in |
 | **Dependencies** | Milestone 3.1 |
 
-### Milestone 3.3 — Provider & Task Integration
+### Milestone 3.3 — Provider & Task Integration ✅
 | Item | Detail |
 |---|---|
 | **Work** | Integrate graph execution with existing `ProviderManager` (using mock/fake providers) and CRM `Task` data models |
-| **Acceptance** | Graph nodes invoke provider abstractions via `ProviderManager`; task state maps to/from LangGraph state |
-| **Tests** | `tests/test_graph_provider_integration.py` — graph invocation with fake provider, task lifecycle mapping |
+| **Acceptance** | Graph nodes invoke provider abstractions via `ProviderManager`; task state maps to/from LangGraph state; TaskExecutor coordinates lifecycle transitions |
+| **Tests** | `tests/test_task_graph.py`, `tests/test_task_executor.py` — graph invocation with MockProvider, task lifecycle mapping (245 tests passing) |
 | **Dependencies** | Milestone 3.2 |
+| **Status** | **COMPLETED** |
 
 ---
 
-## Phase 4 — Agent Hierarchy
+## Phase 4 — Agent Hierarchy (NEXT)
 
 **Goal:** Working orchestrator → domain agent → tool chain implemented via LangGraph.
 
@@ -317,19 +324,18 @@ gantt
 
 ---
 
-## Next Implementation Milestone: Phase 3 — LangGraph Foundation
+## Next Implementation Milestone: Phase 4 — Agent Hierarchy
 
-**The next implementation step is Phase 3 — LangGraph Foundation (Milestones 3.1–3.3):**
+**The next implementation step is Phase 4 — Agent Hierarchy (Milestones 4.1–4.3):**
 
-1. **Milestone 3.1:** LangGraph Core & State Patterns (`State -> Node -> Graph -> Edge -> Compile -> Invoke`).
-2. **Milestone 3.2:** Execution Topologies (Conditional routing, iterative loops, parallel branches).
-3. **Milestone 3.3:** Provider & Task Integration (Wiring graph nodes with `ProviderManager` via test/mock providers and mapping to `Task` lifecycle).
+1. **Milestone 4.1:** Grandparent Orchestrator (Orchestrator graph routing tasks to domain agent sub-graphs).
+2. **Milestone 4.2:** Sales Domain Agent (Sub-graph decomposing domain tasks into tool/specialist calls).
+3. **Milestone 4.3:** CLI Intake Layer (Accepting tasks via CLI and triggering orchestrator execution).
 
 **Why prioritize this next:**
-- Establishes the graph state-machine orchestration engine before building high-level domain agents.
-- Can be completely tested and verified with deterministic code and fake providers ($0 cost, 100% test reliability).
-- Does not block on external LLM services (Ollama or cloud APIs).
-- Concrete providers and Model Router can easily be plugged into graph nodes once the orchestration patterns are proven.
+- Phase 3 LangGraph Foundation is complete with full graph execution, topologies, and task/provider wiring.
+- The Agent Hierarchy can now be built on top of the established LangGraph state-machine patterns.
+- Keeps cost at $0 using deterministic mock providers before connecting live models in Phase 5.
 
 ---
 
