@@ -184,9 +184,9 @@ gantt
 
 ---
 
-## Phase 5 — Concrete Providers & Task/Model Router (IN PROGRESS)
+## Phase 5 — Concrete Providers & Routing (IN PROGRESS)
 
-**Goal:** Multiple real LLM providers with failover, and a router that selects the cheapest suitable method.
+**Goal:** Integrate real LLM providers into the agent hierarchy and implement routing from deterministic methods up to cloud models.
 
 ### Milestone 5.1 — OpenRouter Provider
 | Item | Detail |
@@ -197,21 +197,32 @@ gantt
 | **Dependencies** | Milestone 2.1 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.2 — Local Provider (Ollama) / Additional Providers
+### Milestone 5.2 — LLM-Assisted Orchestrator Classification (OpenRouter) (NEXT)
+| Item | Detail |
+|---|---|
+| **Work** | Integrate optional LLM-assisted domain classification in `GrandparentOrchestrator` when deterministic classification is uncertain. Connects via existing `ProviderManager` / `OpenRouterProvider` abstraction using configured model (`nvidia/nemotron-3.5-lightning:free`). Deterministic classification remains the primary first step. Validates LLM output into strict domain set (`sales`, `marketing`, `customer_service`, `data`, `unknown`). Safe degradation to `unknown` or deterministic result on provider errors, rate limits, or invalid responses. |
+| **Acceptance** | High-confidence deterministic tasks route without calling the LLM; ambiguous tasks leverage LLM classification; invalid outputs or provider outages gracefully fall back without breaking the orchestrator; orchestrator remains provider-agnostic. |
+| **Tests** | `test_orchestrator_llm.py` — deterministic precedence, LLM fallback invocation, valid domain parsing, invalid domain rejection, provider failure fallback, missing key safety, Sales routing compatibility. |
+| **Dependencies** | Milestone 5.1, Milestone 4.1 |
+| **Status** | **NEXT** |
+
+### Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq)
 | Item | Detail |
 |---|---|
 | **Work** | Additional concrete providers (`OllamaProvider`, `GroqProvider`) implementing `BaseProvider`, local/cloud execution, rate limit and health checks. |
 | **Acceptance** | Providers report healthy when running, graceful degradation when unavailable. |
 | **Tests** | Mocked unit tests and optional live verification tests. |
 | **Dependencies** | Milestone 5.1 |
+| **Status** | **DEFERRED** |
 
-### Milestone 5.3 — Task/Model Router
+### Milestone 5.4 — Task / Model Router
 | Item | Detail |
 |---|---|
 | **Work** | `ModelRouter` with capability levels (DETERMINISTIC, ML, LOCAL_SLM, CLOUD_LLM, CLOUD_LLM_CAPABLE), routing logic that queries `ProviderManager` for availability, fallback chain, strict no-paid policy |
 | **Acceptance** | Router selects lowest-cost available method; falls back correctly when providers are down; never selects a paid provider; deterministic tasks bypass LLM entirely |
 | **Tests** | `test_model_router.py` — routing decisions with various provider availability scenarios, capability matching, paid-provider rejection |
-| **Dependencies** | Milestones 5.1–5.2 |
+| **Dependencies** | Milestones 5.1–5.3 |
+| **Status** | **DEFERRED** |
 
 ---
 
