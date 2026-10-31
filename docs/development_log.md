@@ -44,8 +44,9 @@ PROGRESS
 ├── Phase 5 — Concrete Providers & Routing (IN PROGRESS ⏳)
 │   ├── 5.1 OpenRouter Provider       ✅  (BaseProvider, OpenRouter API completions, free models, health checks)
 │   ├── 5.2 LLM-Assisted Orchestrator ✅  (Deterministic + OpenRouter LLM classification fallback)
-│   ├── 5.3 Concrete Providers        ⏳  (DEFERRED: Ollama local provider / Groq)
-│   └── 5.4 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
+│   ├── 5.3 Hierarchy Design          ✅  (4 levels, 20 specialist agents, tools vs agents, 8GB/16GB RAM strategy)
+│   ├── 5.4 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
+│   └── 5.5 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
 ├── Phase 7 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
@@ -72,22 +73,22 @@ PROGRESS
 | 4.3 CLI Intake Layer | Command-line task intake: ArgumentParser (`argparse`), `submit_task` persistent task queue intake + DB lifecycle update (`PENDING -> RUNNING -> COMPLETED/FAILED`), Grandparent Orchestrator execution, `format_task_output` (text/json), `src/main.py` entrypoint | `src/cli/parser.py`, `src/cli/intake.py`, `src/cli/__init__.py`, `src/main.py` | `tests/test_cli.py` (13 tests) |
 | 5.1 OpenRouter Provider | First external AI provider conforming to `BaseProvider` & `ProviderManager`. Integrates OpenRouter OpenAI-compatible completions API, reads credentials securely from env/settings, configurable default model (`nvidia/nemotron-3.5-lightning:free`), health & availability checks, token/latency tracking, robust error mapping, and secret sanitization | `src/providers/openrouter.py`, `src/providers/__init__.py`, `src/config.py`, `.env.example`, `pyproject.toml` | `tests/test_openrouter_provider.py` (18 tests) |
 | 5.2 LLM-Assisted Orchestrator Classification | Added controlled LLM-assisted domain classification fallback to Grandparent Orchestrator. Deterministic classifier remains primary. If uncertain, queries OpenRouter via ProviderManager using configured model (`nvidia/nemotron-3.5-lightning:free`). Validates strictly to supported domains with safe fallback to 'unknown' on error or invalid output. | `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/orchestrator/state.py`, `src/agents/orchestrator/__init__.py` | `tests/test_orchestrator_llm.py` (40 tests) |
+| 5.3 Complete CRM Agent Hierarchy Design | Designed 4-level enterprise CRM Agent Hierarchy (`docs/CRM_AGENT_HIERARCHY.md`): Level 1 Orchestrator, Level 2 Domain Agents (Sales, Marketing, Service, Data), Level 3 Specialist Child Agents (20 total, 5 per domain), Level 4 Sub-specialists vs Deterministic Tools. Established strict rule: CRUD/SQL/calculations must never invoke models. Defined 8GB (≤1.5B model, ≤2.2GB RAM) and 16GB (≤3.8B model, ≤5.5GB RAM) memory budgets and SLM-first local execution roadmap. | `docs/CRM_AGENT_HIERARCHY.md`, `docs/architecture.md`, `docs/roadmap.md`, `docs/AGENT_HIERARCHY_AUDIT.md` | Zero regression (392 tests passing) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.2 complete. Preparing for Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq).
+**Active milestone:** Milestone 5.3 complete. Preparing for Milestone 5.4 — Local Provider (Ollama / Local SLM).
 
-**Milestone 5.2 Status:** COMPLETE
-- Integrated **LLM-Assisted Domain Classification** into `GrandparentOrchestrator` as an optional fallback when deterministic classification is uncertain.
-- Preserved **Deterministic Classification** as primary: tasks with strong keyword signals or explicit overrides route immediately without calling the LLM.
-- Extended `OrchestratorState` with `classification_method` (`"deterministic"`, `"llm"`, `"fallback"`).
-- Wired through **ProviderManager** abstraction (`provider_manager.get_available_provider()`), keeping orchestrator completely decoupled from OpenRouter HTTP/API details.
-- Validated LLM responses strictly against `SUPPORTED_DOMAINS` (`sales`, `marketing`, `customer_service`, `data`, `unknown`), rejecting arbitrary output.
-- Robust failure handling: falls back gracefully to `unknown` upon provider errors, timeouts, empty responses, or malformed outputs.
-- Tested: 40 focused unit tests passing; 392 total regression tests passing (exit code 0).
-- Live API verification performed: 1 real test on OpenRouter with `nvidia/nemotron-3.5-lightning:free` correctly classified an ambiguous task as `sales` and routed to the Sales Domain Agent.
+**Milestone 5.3 Status:** COMPLETE
+- Formalized complete 4-tier Salesforce-like agent architecture in `docs/CRM_AGENT_HIERARCHY.md`.
+- Specified 20 Level 3 Specialist Child Agents across 4 domains (Sales, Marketing, Customer Service, Data & Analytics).
+- Codified strict boundaries: deterministic Python tools for all CRUD, schema lookups, and arithmetic; SLM/LLMs exclusively reserved for cognitive/unstructured tasks.
+- Defined local hardware operational profiles for standard 8GB and 16GB RAM laptops (model footprint limits, lazy-loading lifecycle, CPU inference).
+- Documented inter-agent message schema (`AgentMessage`), task delegation protocols, and SQLite CRM entity schema.
+- Aligned `docs/architecture.md` and `docs/roadmap.md` to reflect the 4-level hierarchy and updated milestone sequence.
+- All 392 existing regression tests remain intact and passing (exit code 0).
 
 ---
 
@@ -118,20 +119,22 @@ None currently.
 | First CRM domain | Leads | Most self-contained workflow |
 | License | MIT | Simple, permissive |
 | Cost policy | $0 ceiling | Never auto-escalate to paid APIs |
+| Hierarchy Architecture | 4-Level Model (Orchestrator → Domain → Specialist → Tools/Sub-agents) | Separates concerns cleanly; matches enterprise CRM structures (Salesforce) |
+| Deterministic Tool Boundary | CRUD/SQL/Calculations strictly Python tools | Never waste model tokens or introduce hallucination risk for simple data operations |
+| SLM-First Local Strategy | Small models (≤1.5B on 8GB RAM, ≤3.8B on 16GB RAM) | Enables complete offline operation on commodity laptops without cloud lock-in |
+| Memory Management | Lazy model loading & single-model concurrency | Keeps memory within strict 2.2GB (8GB RAM) and 5.5GB (16GB RAM) budgets |
 
 ---
 
 ## Next Step
 
-**Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq)**
+**Milestone 5.4 — Local Provider (Ollama / Local SLMs)**
 
-Implement additional concrete providers implementing `BaseProvider`:
-- `OllamaProvider`: local SLM execution via Ollama HTTP API.
-- `GroqProvider`: cloud execution with fast inference.
-- Register into `ProviderManager` with health checks and rate limit handling.
-- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.3
-
----
+Implement `OllamaProvider` conforming to `BaseProvider`:
+- Local SLM execution via Ollama HTTP API.
+- Support for target lightweight models (Qwen2.5-1.5B, Phi-3-mini 3.8B).
+- Register into `ProviderManager` with health check, availability detection, and zero-cloud fallback.
+- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.4
 
 ---
 
@@ -140,9 +143,12 @@ Implement additional concrete providers implementing `BaseProvider`:
 ```
 Branch:      main
 Remote:      origin/main
-Last commit: 84d9a56  feat: implement OpenRouter provider (Milestone 5.1)
+Last commit: 3d31dda  feat: implement LLM-assisted orchestrator classification (Milestone 5.2)
 
 Uncommitted work:
+  CREATED   docs/CRM_AGENT_HIERARCHY.md
+  CREATED   docs/AGENT_HIERARCHY_AUDIT.md
+  MODIFIED  docs/architecture.md
   MODIFIED  docs/roadmap.md
   MODIFIED  docs/development_log.md
 ```
@@ -191,4 +197,5 @@ Resolution: <one-line description>
 | 2026-10-31 | Milestone 4.3: CLI Intake Layer implemented. 334 tests passed (exit code 0). Committed and pushed as `5ad7461`. |
 | 2026-10-31 | Milestone 5.1: OpenRouter Provider implemented. 352 tests passed (exit code 0). Committed and pushed as `84d9a56`. |
 | 2026-10-31 | Strategic Roadmap Realignment (Option A): Milestone 5.2 set to LLM-Assisted Orchestrator Classification (OpenRouter); Ollama/Groq deferred to Milestone 5.3. Committed and pushed as `c5ab420`. |
-| 2026-10-31 | Milestone 5.2: LLM-Assisted Orchestrator Classification implemented. 392 tests passed (exit code 0). |
+| 2026-10-31 | Milestone 5.2: LLM-Assisted Orchestrator Classification implemented. 392 tests passed (exit code 0). Committed and pushed as `3d31dda`. |
+| 2026-10-31 | Milestone 5.3: Complete CRM Agent Hierarchy Design implemented (`docs/CRM_AGENT_HIERARCHY.md`). 392 tests passed (exit code 0). |

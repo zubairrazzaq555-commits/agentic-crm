@@ -1,6 +1,6 @@
 # Agentic CRM — Development Roadmap
 
-> **Status:** Active — Phases 1, 2 (partial), & 3 complete, Phase 4 (Agent Hierarchy) next  
+> **Status:** Active — Phases 1, 2 (partial), 3, & 4 complete, Phase 5 (Concrete Providers & Routing) in progress  
 > **Last updated:** 2026-10-31  
 > **Approach:** Incremental, MVP-first. Each phase produces tested, working software.
 
@@ -19,15 +19,21 @@
     - Milestone 3.1: LangGraph Core & State Patterns ✅
     - Milestone 3.2: Execution Topologies (Branching, Loops, Parallel) ✅
     - Milestone 3.3: Provider & Task Integration ✅
-- **CURRENT**:
-  - Phase 3 complete. Preparing for Phase 4 (Agent Hierarchy).
-- **NEXT**:
   - **Phase 4 — Agent Hierarchy**:
-    - Milestone 4.1: Grandparent Orchestrator Graph
-    - Milestone 4.2: Sales Domain Agent Sub-Graph (Stub)
-    - Milestone 4.3: CLI Intake Layer
+    - Milestone 4.1: Grandparent Orchestrator Graph ✅
+    - Milestone 4.2: Sales Domain Agent Sub-Graph ✅
+    - Milestone 4.3: CLI Intake Layer ✅
+  - **Phase 5 — Concrete Providers & Routing**:
+    - Milestone 5.1: OpenRouter Provider ✅
+    - Milestone 5.2: LLM-Assisted Orchestrator Classification (OpenRouter) ✅
+    - Milestone 5.3: Complete CRM Agent Hierarchy Design ✅
+- **CURRENT**:
+  - Phase 5 in progress. Milestone 5.3 (Hierarchy Design) complete.
+- **NEXT**:
+  - **Phase 5 — Concrete Providers & Routing**:
+    - Milestone 5.4: Local Provider (Ollama / Local SLM) (NEXT)
+    - Milestone 5.5: Task / Model Router (DEFERRED)
 - **FUTURE (Re-sequenced)**:
-  - **Phase 5 — Concrete Providers & Model Router**: Ollama, Gemini, Groq, Model Router (to be plugged into the LangGraph execution layer)
   - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
   - **Phase 7 — First CRM Feature**: Leads CRUD, rule-based scoring, Sales Agent integration
   - **Phase 8 — API & Scheduling**: FastAPI REST layer, APScheduler
@@ -51,14 +57,11 @@ gantt
     section Phase 3 — LangGraph (DONE)
     Core, Topologies, Integration   :done, p3, 2026-10-31, 2026-10-31
 
-    section Phase 4 — Agent Hierarchy (NEXT)
-    Orchestrator & Domain Agents    :active, p4, 2026-10-31, 5d
+    section Phase 4 — Agent Hierarchy (DONE)
+    Orchestrator, Sales Agent, CLI  :done, p4, 2026-10-31, 2026-10-31
 
-    section Phase 4 — Agent Hierarchy
-    Orchestrator & Domain Agents    :p4, after p3, 5d
-
-    section Phase 5 — Providers & Router
-    Ollama, Cloud, Model Router     :p5, after p4, 5d
+    section Phase 5 — Providers & Routing (IN PROGRESS)
+    OpenRouter, LLM Fallback, Design:active, p5, 2026-10-31, 5d
 
     section Phase 6 — Reliability
     Worker, Idempotency, Audit      :p6, after p5, 5d
@@ -206,22 +209,31 @@ gantt
 | **Dependencies** | Milestone 5.1, Milestone 4.1 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq) (NEXT)
+### Milestone 5.3 — Complete CRM Agent Hierarchy Design ✅
 | Item | Detail |
 |---|---|
-| **Work** | Additional concrete providers (`OllamaProvider`, `GroqProvider`) implementing `BaseProvider`, local/cloud execution, rate limit and health checks. |
-| **Acceptance** | Providers report healthy when running, graceful degradation when unavailable. |
-| **Tests** | Mocked unit tests and optional live verification tests. |
-| **Dependencies** | Milestone 5.1 |
+| **Work** | Design the complete 4-level Salesforce-like CRM Agent Hierarchy document (`docs/CRM_AGENT_HIERARCHY.md`): Level 1 Grandparent Orchestrator, Level 2 Domain Parent Agents (Sales, Marketing, Customer Service, Data & Analytics), Level 3 Specialist Child Agents (5 per domain, 20 total), and Level 4 Sub-specialists vs Deterministic Python Tools. Define strict boundaries ensuring basic CRUD, SQL queries, and calculations never invoke models. Formalize hardware profiles and memory budgets for 8GB and 16GB RAM laptop execution (SLM-first strategy, ≤1.5B/≤3.8B parameter models, lazy loading). Map all agent schemas, communication patterns, database tables, and component implementation statuses. |
+| **Acceptance** | Comprehensive hierarchy specification document created; `docs/architecture.md` and `docs/roadmap.md` updated to reflect 4-tier model and local SLM strategy; zero code/test regression. |
+| **Tests** | Documentation verification; existing test suite maintains 100% pass rate (392 passed). |
+| **Dependencies** | Milestone 4.2, Milestone 5.2 |
+| **Status** | **COMPLETED** |
+
+### Milestone 5.4 — Local Provider (Ollama / Local SLMs) (NEXT)
+| Item | Detail |
+|---|---|
+| **Work** | Implement `OllamaProvider` conforming to `BaseProvider` for local SLM execution. Target efficient small models suited for 8GB RAM laptops (Qwen2.5-1.5B, Llama-3.2-1B) and 16GB RAM laptops (Phi-3-mini 3.8B, Qwen2.5-3B). Add optional cloud fast-inference provider (`GroqProvider`). Register into `ProviderManager` with health checks, rate limit handling, and zero-cloud fallback. |
+| **Acceptance** | Local provider executes completions without internet or API keys; graceful degradation when Ollama server is offline; strict memory safety. |
+| **Tests** | Mocked unit tests and optional live verification tests against local Ollama instance. |
+| **Dependencies** | Milestone 5.1, Milestone 5.3 |
 | **Status** | **NEXT** |
 
-### Milestone 5.4 — Task / Model Router
+### Milestone 5.5 — Task / Model Router
 | Item | Detail |
 |---|---|
 | **Work** | `ModelRouter` with capability levels (DETERMINISTIC, ML, LOCAL_SLM, CLOUD_LLM, CLOUD_LLM_CAPABLE), routing logic that queries `ProviderManager` for availability, fallback chain, strict no-paid policy |
 | **Acceptance** | Router selects lowest-cost available method; falls back correctly when providers are down; never selects a paid provider; deterministic tasks bypass LLM entirely |
 | **Tests** | `test_model_router.py` — routing decisions with various provider availability scenarios, capability matching, paid-provider rejection |
-| **Dependencies** | Milestones 5.1–5.3 |
+| **Dependencies** | Milestones 5.1–5.4 |
 | **Status** | **DEFERRED** |
 
 ---

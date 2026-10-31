@@ -1,24 +1,25 @@
 # Agentic CRM — Architecture Document
 
-> **Status:** Draft v0.1 · Planning phase  
-> **Last updated:** 2026-10-22  
-> **Scope:** Analysis and design — no implementation decisions are final until approved.
+> **Status:** Active Architecture Specification v0.2 · Multi-Agent Salesforce-Like CRM  
+> **Last updated:** 2026-10-31  
+> **Scope:** Multi-agent hierarchy, deterministic routing, SLM-first local execution (8GB/16GB RAM), and provider architecture.
 
 ---
 
 ## 1. System Overview
 
-The Agentic CRM is a modular, hierarchical, event-driven CRM system that combines deterministic logic with intelligent agent orchestration. It is designed to run on a single Windows laptop during development and testing, with zero paid API costs, and to scale toward reliable 24/7 operation as infrastructure becomes available.
+The Agentic CRM is a modular, hierarchical, event-driven CRM system inspired by enterprise platforms like Salesforce, combining deterministic Python execution with multi-tiered agent orchestration. It is designed to run locally on single Windows/Linux laptops with either 8 GB or 16 GB of RAM, adhering strictly to a **zero mandatory cloud costs** and **SLM-first** local execution philosophy while retaining graceful cloud fallback options.
 
 ### 1.1 Design Principles
 
 | Principle | Implication |
 |---|---|
-| **Agent frugality** | Use LLM agents only where reasoning, language understanding, or generation is genuinely needed. Prefer Python functions, SQL, rules, conventional ML, or templating everywhere else. |
-| **Cost ceiling = $0** | All external APIs must be free-tier. The system must never silently escalate to a paid tier. |
-| **Graceful degradation** | When all cloud quotas are exhausted, the system degrades to local models or queues tasks — it never crashes or loses data. |
-| **Incremental buildout** | Each milestone is small, testable, and independently useful. |
-| **Modularity** | Providers, agents, tools, domain logic, and persistence are behind clean interfaces so any can be swapped or extended without rewriting. |
+| **SLM-First & Local-First** | Prioritize small language models (≤1.5B on 8GB RAM, ≤3.8B on 16GB RAM) running locally via Ollama or llama.cpp. Avoid mandatory external cloud dependencies. |
+| **Agent Frugality & Tool Boundary** | Use LLM/SLM agents only where unstructured reasoning, language comprehension, or open-ended synthesis is required. CRUD operations, SQL queries, metric calculations, and validation are strictly deterministic Python tools. |
+| **4-Level Hierarchy** | Work flows down a clean 4-tier chain of command: Level 1 Orchestrator → Level 2 Domain Agents → Level 3 Specialist Agents → Level 4 Sub-specialists / Deterministic Tools. |
+| **Cost ceiling = $0** | All external APIs must utilize free tiers or remain zero-cost. The system never auto-escalates to paid models. |
+| **Graceful Degradation** | Deterministic logic always serves as primary baseline. If cloud models quota-out or local SLMs are unavailable, tasks safely queue or degrade without data loss or crashes. |
+| **Hardware-Aware Memory Budgets** | Strict memory ceilings: ≤2.2 GB model footprint for 8 GB RAM systems; ≤5.5 GB model footprint for 16 GB RAM systems; lazy model loading on CPU/GPU. |
 
 ---
 
@@ -51,75 +52,65 @@ The Agentic CRM is a modular, hierarchical, event-driven CRM system that combine
 
 ---
 
-## 3. Component Architecture
+## 3. Component Architecture & 4-Level CRM Hierarchy
+
+The CRM architecture is organized into a 4-level hierarchical model (fully detailed in [`docs/CRM_AGENT_HIERARCHY.md`](CRM_AGENT_HIERARCHY.md)):
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        API / CLI / Event Intake                  │
-│                  (FastAPI endpoints, CLI commands, schedulers)    │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    GRANDPARENT ORCHESTRATOR                       │
-│  • Receives tasks from intake layer                              │
-│  • Classifies domain (Sales, Service, Marketing, Data, etc.)     │
-│  • Delegates to the appropriate Domain Agent                     │
-│  • Tracks overall task lifecycle                                 │
-│  • May itself be deterministic (rule-based router) initially     │
-└───────┬──────────┬──────────┬──────────┬────────────┬────────────┘
-        │          │          │          │            │
-        ▼          ▼          ▼          ▼            ▼
-   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
-   │ Sales  │ │Service │ │Market- │ │ Data   │ │Integra-  │
-   │ Agent  │ │ Agent  │ │ ing    │ │ Agent  │ │tions     │
-   │(Parent)│ │(Parent)│ │ Agent  │ │(Parent)│ │Agent     │
-   └───┬────┘ └───┬────┘ └───┬────┘ └───┬────┘ └────┬─────┘
-       │          │          │          │            │
-       ▼          ▼          ▼          ▼            ▼
+Level 1: Grandparent Orchestrator (Top-Level Dispatcher & Lifecycle Manager)
+  │ [IMPLEMENTED: Deterministic Classifier + OpenRouter LLM Fallback]
+  │
+  ├──► Level 2: Sales Domain Agent (Parent) [PARTIALLY IMPLEMENTED]
+  │      ├──► Level 3: Lead Management Agent [PLANNED]
+  │      │      ├──► Level 4 Tools: Lead CRUD, Duplicate Detection, Phone/Email Validator
+  │      │      └──► Level 4 Sub-Agent: Lead Intent Extraction SLM
+  │      ├──► Level 3: Contact Management Agent [PLANNED]
+  │      ├──► Level 3: Account Management Agent [PLANNED]
+  │      ├──► Level 3: Opportunity Management Agent [PLANNED]
+  │      └──► Level 3: Deal Management Agent [PLANNED]
+  │
+  ├──► Level 2: Marketing Domain Agent (Parent) [PLACEHOLDER]
+  │      ├──► Level 3: Campaign Management Agent [PLANNED]
+  │      ├──► Level 3: Email Marketing Agent [PLANNED]
+  │      ├──► Level 3: Audience Segmentation Agent [PLANNED]
+  │      ├──► Level 3: Marketing Automation Agent [PLANNED]
+  │      └──► Level 3: Campaign Analytics Agent [PLANNED]
+  │
+  ├──► Level 2: Customer Service Domain Agent (Parent) [PLACEHOLDER]
+  │      ├──► Level 3: Customer Support Agent [PLANNED]
+  │      ├──► Level 3: Ticket Management Agent [PLANNED]
+  │      ├──► Level 3: Ticket Classification Agent [PLANNED]
+  │      ├──► Level 3: Query Resolution Agent [PLANNED]
+  │      └──► Level 3: Customer Satisfaction Agent [PLANNED]
+  │
+  └──► Level 2: Data & Analytics Domain Agent (Parent) [PLACEHOLDER]
+         ├──► Level 3: Sales Analytics Agent [PLANNED]
+         ├──► Level 3: Customer Analytics Agent [PLANNED]
+         ├──► Level 3: Report Generation Agent [PLANNED]
+         ├──► Level 3: Sales Forecasting Agent [PLANNED]
+         └──► Level 3: Business Intelligence Agent [PLANNED]
+
+Cross-Cutting Execution & Infrastructure:
   ┌─────────────────────────────────────────────────────────┐
-  │              SPECIALIST AGENTS & TOOLS                   │
-  │  • Lead Scorer (ML model or rules)                       │
-  │  • Email Drafter (LLM agent)                             │
-  │  • Data Enrichment (API tool)                            │
-  │  • Report Generator (template + SQL)                     │
-  │  • Calendar Scheduler (deterministic)                    │
-  │  • ... (added incrementally)                             │
-  └─────────────────────────────────────────────────────────┘
-       │          │          │          │            │
-       ▼          ▼          ▼          ▼            ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │               TASK / MODEL ROUTER                        │
-  │  Selects execution method per-task:                      │
-  │  1. Deterministic code (Python function, SQL, rules)     │
-  │  2. Conventional ML/DL model                             │
-  │  3. Local SLM (Ollama)                                   │
-  │  4. Free cloud LLM (Gemini, Groq, etc.)                 │
-  │  5. More capable cloud LLM (only if genuinely needed)    │
-  │  ─────────────────────────────────────────               │
-  │  • Enforces NO-PAID-FALLBACK policy                      │
-  │  • Tracks quotas, rate limits, costs                     │
-  │  • Automatic fallback down the capability ladder          │
-  └──────────────────────┬──────────────────────────────────┘
-                         │
-                         ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │               PROVIDER MANAGER                           │
-  │  • Registry of all LLM / API providers                   │
-  │  • Health checks, quota tracking, rate-limit backoff     │
-  │  • Circuit breaker per provider                          │
-  │  • Retry with exponential backoff + jitter               │
-  │  • Never escalates to paid tier                          │
-  └──────────────────────┬──────────────────────────────────┘
-                         │
-                         ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │               PERSISTENCE LAYER                          │
-  │  • SQLite database (tasks, CRM entities, config, logs)   │
-  │  • Task queue table (pending, in-progress, completed,    │
-  │    failed, retry-scheduled)                              │
-  │  • Idempotency keys to prevent duplicate side effects    │
-  │  • Audit log for all agent decisions                     │
+  │               TASK / MODEL ROUTER (Planned)              │
+  │  Selects execution method per sub-task:                  │
+  │  1. Deterministic Python Tools / SQL queries (Cost: $0)  │
+  │  2. Local SLMs (Ollama ≤1.5B/3.8B - 8GB/16GB RAM)       │
+  │  3. Free Cloud LLMs (OpenRouter/Groq/Gemini free tiers)  │
+  │  Strict No-Paid-Fallback policy enforced                │
+  └───────────────────────────┬─────────────────────────────┘
+                              │
+  ┌───────────────────────────▼─────────────────────────────┐
+  │               PROVIDER MANAGER [IMPLEMENTED]            │
+  │  Registry, health tracking, circuit breaker, retries    │
+  │  Providers: MockProvider, OpenRouterProvider            │
+  │  Planned: OllamaProvider (Local SLM), GroqProvider      │
+  └───────────────────────────┬─────────────────────────────┘
+                              │
+  ┌───────────────────────────▼─────────────────────────────┐
+  │               PERSISTENCE LAYER [IMPLEMENTED]           │
+  │  SQLite database (tasks, task_queue, providers, audit)  │
+  │  Future CRM Entities: leads, contacts, accounts, deals   │
   └─────────────────────────────────────────────────────────┘
 ```
 
@@ -127,30 +118,48 @@ The Agentic CRM is a modular, hierarchical, event-driven CRM system that combine
 
 ## 4. Component Boundaries & Responsibilities
 
-### 4.1 Intake Layer
-- **CLI interface** (Phase 1): Accept tasks as text commands.
-- **FastAPI endpoints** (Phase 3+): REST API for external integrations.
-- **Scheduler** (Phase 4+): Cron-like triggers for recurring tasks.
-- **Responsibility:** Validate input, create a Task record, enqueue it.
+The system strictly delineates responsibilities across four hierarchical levels to avoid monolithic agents and unnecessary model inference. For full details on all 20 Level 3 specialist agents and schemas, see [`docs/CRM_AGENT_HIERARCHY.md`](CRM_AGENT_HIERARCHY.md).
 
-### 4.2 Grandparent Orchestrator
-- **Initially:** A rule-based Python router (keyword/regex matching to domain).
-- **Later:** Can be upgraded to use an LLM for ambiguous task classification.
-- **Responsibility:** Receive Task from queue, classify domain, delegate to the correct Domain Agent, track lifecycle (pending → running → success/failure), handle retries at the orchestration level.
+### 4.1 Level 1: Grandparent Orchestrator
+- **Status:** `IMPLEMENTED` (`src/agents/orchestrator/orchestrator.py`)
+- **Responsibility:** Top-level intake from persistent queue, domain routing (`sales`, `marketing`, `customer_service`, `data`, `unknown`), overall task lifecycle management.
+- **Classification Flow:** Deterministic keyword/pattern classifier first. If ambiguous, triggers optional LLM-assisted classification (OpenRouter) with strict schema validation and graceful fallback to `unknown`.
 
-### 4.3 Domain Agents (Parents)
-- One per CRM domain: Sales, Service, Marketing, Data, Integrations.
-- **Built incrementally** — Sales Agent is the first, others added later.
-- **Responsibility:** Decompose a domain-level task into sub-tasks, delegate to specialist agents or tools, aggregate results, report back to orchestrator.
-- **May or may not use an LLM** — a Sales Agent that only manages leads might be mostly deterministic until it needs to draft personalized emails.
+### 4.2 Level 2: Domain Parent Agents
+- **Status:** Sales (`PARTIALLY IMPLEMENTED` in `src/agents/sales/agent.py`); Marketing, Customer Service, Data & Analytics (`PLACEHOLDER` in `src/agents/orchestrator/handlers.py`).
+- **Responsibility:** Receive domain tasks from the Orchestrator, decompose complex business workflows into specialist sub-tasks, delegate to Level 3 Specialist Agents, and synthesize aggregated results back to Level 1.
+- **Execution:** Coordinated using LangGraph StateGraphs.
 
-### 4.4 Specialist Agents & Tools
-- Focused, single-responsibility units.
-- **Agents** (need reasoning): Email Drafter, Meeting Summarizer, etc.
-- **Tools** (deterministic): Lead CRUD operations, report SQL queries, data validation, etc.
-- **Responsibility:** Execute a specific sub-task, return structured results.
+### 4.3 Level 3: Specialist Child Agents (20 Total across 4 Domains)
+- **Status:** `PLANNED`
+- **Sales Domain (5):** Lead Management, Contact Management, Account Management, Opportunity Management, Deal Management.
+- **Marketing Domain (5):** Campaign Management, Email Marketing, Audience Segmentation, Marketing Automation, Campaign Analytics.
+- **Customer Service Domain (5):** Customer Support, Ticket Management, Ticket Classification, Query Resolution, Customer Satisfaction.
+- **Data & Analytics Domain (5):** Sales Analytics, Customer Analytics, Report Generation, Sales Forecasting, Business Intelligence.
+- **Responsibility:** Deep, domain-specific execution. Each specialist orchestrates a narrowly defined business lifecycle using Level 4 tools and sub-specialist SLMs.
 
-### 4.5 Task / Model Router
+### 4.4 Level 4: Sub-Specialists vs. Deterministic Tools
+- **Deterministic Python Tools (Primary Baseline):**
+  - **Rule:** Simple CRUD, database queries, calculations, schema validations, and formatting **must NEVER be assigned to an LLM/SLM**.
+  - Implemented as pure Python functions or SQL queries (`lead_repository.insert()`, `calculate_pipeline_velocity()`).
+- **Sub-Specialist Agents (Cognitive Tasks Only):**
+  - Invoked only for unstructured reasoning, sentiment analysis, email synthesis, or entity extraction.
+  - Powered by local SLMs (e.g. Qwen2.5-1.5B or Phi-3-mini) through the Provider Manager.
+
+### 4.5 Hardware Profiling & Memory Budgets (8GB vs 16GB RAM)
+To ensure reliable operation on standard laptops without requiring a dedicated GPU or crashing system memory:
+- **8 GB RAM Profile:**
+  - Operating System & Agent CRM Core: ~4.5 GB to 5.0 GB
+  - Model Memory Ceiling: **≤2.2 GB**
+  - Target Models: Qwen2.5-1.5B (Q4_K_M ~1.1 GB) or Llama-3.2-1B (Q4_K_M ~0.9 GB)
+  - Strategy: Strict single-model concurrency, lazy loading into RAM only during inference.
+- **16 GB RAM Profile:**
+  - Operating System & Agent CRM Core: ~6.0 GB to 7.0 GB
+  - Model Memory Ceiling: **≤5.5 GB**
+  - Target Models: Phi-3-mini 3.8B (Q4_K_M ~2.4 GB) or Qwen2.5-3B (Q4_K_M ~2.0 GB)
+  - Strategy: Fast local inference on CPU/iGPU, background model pre-warming.
+
+### 4.6 Task / Model Router
 - **Separate component** from the agent hierarchy.
 - Called by any agent or tool that needs to decide *how* to execute a sub-task.
 - Decision logic:
@@ -162,7 +171,7 @@ The Agentic CRM is a modular, hierarchical, event-driven CRM system that combine
 - **Routing metadata:** Each task type can declare a `min_capability` level. The router finds the cheapest method that meets it.
 - **Quota awareness:** The router queries the Provider Manager for current availability before dispatching.
 
-### 4.6 Provider Manager
+### 4.7 Provider Manager
 - **Registry pattern:** Each provider (Gemini, Groq, Ollama, etc.) is a plugin implementing a common interface.
 - **Tracks per-provider:**
   - Remaining quota (requests/day, tokens/minute)
@@ -172,7 +181,7 @@ The Agentic CRM is a modular, hierarchical, event-driven CRM system that combine
 - **Circuit breaker:** After N consecutive failures, mark provider as "down" for a cooldown period.
 - **Strict policy:** A provider's `is_paid` flag is checked before every call. Paid providers are **never** selected automatically.
 
-### 4.7 Persistence Layer
+### 4.8 Persistence Layer
 - **SQLite database** with well-defined schemas.
 - **Key tables (initial):**
   - `tasks` — id, type, domain, status, payload, result, created_at, updated_at, retry_count, idempotency_key
