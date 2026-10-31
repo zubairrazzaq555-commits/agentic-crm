@@ -36,16 +36,20 @@ PROGRESS
 │   ├── 3.2 Execution Topologies      ✅  (Conditional branching, iterative loops, parallel fan-out/in)
 │   └── 3.3 Provider/Task Integration ✅  (Task-to-Graph mapping, ProviderManager, MockProvider, TaskExecutor)
 │
-├── Phase 4 — Agent Hierarchy         ⏳  (NEXT: Grandparent Orchestrator, Sales Agent, CLI Intake)
+├── Phase 4 — Agent Hierarchy         (COMPLETE ✅)
+│   ├── 4.1 Grandparent Orchestrator  ✅  (Top-level domain router, StateGraph, handler nodes)
+│   ├── 4.2 Sales Domain Agent        ✅  (Sales subdomain classifier, StateGraph, subdomain handlers)
+│   └── 4.3 CLI Intake Layer          ✅  (argparse, DB task lifecycle, orchestrator execution)
 │
-├── Phase 5 — Concrete Providers      ⏳  (DEFERRED: Ollama, Cloud Gemini/Groq, Model Router)
+├── Phase 5 — Concrete Providers      (IN PROGRESS ⏳)
+│   └── 5.1 OpenRouter Provider       ✅  (BaseProvider, OpenRouter API completions, free models, health checks)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
 ├── Phase 7 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 245 tests passed (exit code 0)
+**Last verified test count:** 352 tests passed (exit code 0)
 
 ---
 
@@ -63,19 +67,22 @@ PROGRESS
 | 4.1 Grandparent Orchestrator | Hierarchical top-level dispatcher: OrchestratorState schema, deterministic rule-based domain classifier, decoupled domain handler nodes (sales, marketing, customer_service, data, unknown), compiled LangGraph StateGraph, sync/async GrandparentOrchestrator | `src/agents/orchestrator/state.py`, `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/handlers.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/__init__.py` | `tests/test_orchestrator.py` (37 tests) |
 | 4.2 Sales Domain Agent Foundation | SalesAgentState schema, deterministic sales subdomain classifier (`lead_management`, `opportunity_management`, `deal_management`, `general_sales`), decoupled subdomain handlers, compiled LangGraph StateGraph, sync/async SalesDomainAgent, Grandparent Orchestrator integration | `src/agents/sales/state.py`, `src/agents/sales/classifier.py`, `src/agents/sales/handlers.py`, `src/agents/sales/agent.py`, `src/agents/sales/__init__.py`, `src/agents/__init__.py` | `tests/test_sales_agent.py` (39 tests) |
 | 4.3 CLI Intake Layer | Command-line task intake: ArgumentParser (`argparse`), `submit_task` persistent task queue intake + DB lifecycle update (`PENDING -> RUNNING -> COMPLETED/FAILED`), Grandparent Orchestrator execution, `format_task_output` (text/json), `src/main.py` entrypoint | `src/cli/parser.py`, `src/cli/intake.py`, `src/cli/__init__.py`, `src/main.py` | `tests/test_cli.py` (13 tests) |
+| 5.1 OpenRouter Provider | First external AI provider conforming to `BaseProvider` & `ProviderManager`. Integrates OpenRouter OpenAI-compatible completions API, reads credentials securely from env/settings, configurable default model (`nvidia/nemotron-3.5-lightning:free`), health & availability checks, token/latency tracking, robust error mapping, and secret sanitization | `src/providers/openrouter.py`, `src/providers/__init__.py`, `src/config.py`, `.env.example`, `pyproject.toml` | `tests/test_openrouter_provider.py` (18 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 4.3 complete. Phase 4 (Agent Hierarchy) complete. Preparing for Phase 5 (Concrete Providers & Task/Model Router - Milestone 5.1 Ollama).
+**Active milestone:** Milestone 5.1 complete. Phase 5 (Concrete Providers) in progress.
 
-**Milestone 4.3 Status:** COMPLETE
-- Implemented **ArgumentParser** (`src/cli/parser.py`) standard library `argparse` with positional description, `-t/--task-type`, `-p/--payload`, `--priority`, `--domain`, `--json`, and `--db-url`.
-- Implemented **Task Intake Coordinator** (`src/cli/intake.py`) managing task packaging, persistent queue registration via `enqueue_task`, lifecycle tracking (`RUNNING` to `COMPLETED`/`FAILED`), and execution delegation through `GrandparentOrchestrator`.
-- Implemented **Formatters & CLI Runner** (`src/cli/intake.py`) terminal text/json formatting with nested subdomain detail display and async/sync runners (`run_cli`, `main`).
-- Implemented **Top-level Application Entrypoint** (`src/main.py`) enabling direct invocation (`python -m src.main "Qualify lead John Doe"`).
-- Tested: 13 focused CLI tests passing; 334 total regression tests passing (exit code 0).
+**Milestone 5.1 Status:** COMPLETE
+- Implemented **OpenRouterProvider** (`src/providers/openrouter.py`) implementing `BaseProvider` and integrated into `ProviderManager`.
+- Built async generation (`generate`) via OpenRouter `/chat/completions` endpoint with model overrides, parameter passthrough, and reasoning fallback.
+- Added provider availability check (`check_availability`) using `/models` endpoint without billable consumption.
+- Implemented robust error handling with automatic redaction of API keys from error messages, logs, and tracebacks.
+- Verified unit test suite with 18 mock-based tests (`httpx.MockTransport`) covering auth, rate limits, server errors, timeouts, and circuit breaker trip.
+- Completed controlled live verification with `nvidia/nemotron-3.5-lightning:free`.
+- Tested: 352 total regression tests passing (exit code 0).
 
 ---
 
@@ -98,7 +105,9 @@ None currently.
 | DB / Graph Isolation | TaskExecutor coordinator | Keeps graph nodes pure; database operations stay outside graphs |
 | Parallel State Reducer | `Annotated[List, operator.add]` | Prevents state update conflicts during parallel fan-in |
 | Loop Safety | Explicit max iterations ceiling | Prevents graph infinite execution loops under any condition |
-| Concrete Providers | Deferred to Phase 5 | Fake/mock providers via ProviderManager suffice for LangGraph |
+| First External Provider | OpenRouter | Multi-model catalog, OpenAI-compatible API, free models |
+| First Free Model | `nvidia/nemotron-3.5-lightning:free` | Available on OpenRouter free tier |
+| Secret Sanitization | Redact API key in all errors & exceptions | Eliminates risk of secret leakage in logs/traces |
 | First CRM domain | Leads | Most self-contained workflow |
 | License | MIT | Simple, permissive |
 | Cost policy | $0 ceiling | Never auto-escalate to paid APIs |
@@ -107,15 +116,9 @@ None currently.
 
 ## Next Step
 
-**Milestone 4.1 — Grandparent Orchestrator (Phase 4 — Agent Hierarchy)**
+**Milestone 5.2 — Next Provider / Concrete Provider Expansion**
 
-Implement top-level orchestrator graph:
-- Accepts tasks from queue/TaskExecutor
-- Classifies domain (rules/pattern matching initially)
-- Delegates task execution to domain agent sub-graphs
-- Tracks top-level task lifecycle and error recovery
-
-Reference: `docs/roadmap.md` → Phase 4, Milestone 4.1
+Implement additional providers (e.g. Ollama local provider or Groq) according to the Phase 5 roadmap.
 
 ---
 
@@ -178,4 +181,8 @@ Resolution: <one-line description>
 | 2026-10-31 | Strategic Roadmap Realignment: Prioritized Phase 3 LangGraph Foundation. Committed and pushed as `4b6bc29`. |
 | 2026-10-31 | Milestone 3.1: LangGraph Core & State Patterns implemented. 229 tests passed (exit code 0). Committed and pushed as `2520cfb`. |
 | 2026-10-31 | Milestone 3.2: Execution Topologies (Conditional, Loop, Parallel) implemented. 236 tests passed (exit code 0). Committed and pushed as `2839712`. |
-| 2026-10-31 | Milestone 3.3: Provider & Task Integration implemented. 245 tests passed (exit code 0). |
+| 2026-10-31 | Milestone 3.3: Provider & Task Integration implemented. 245 tests passed (exit code 0). Committed and pushed as `527d011`. |
+| 2026-10-31 | Milestone 4.1: Grandparent Orchestrator implemented. 282 tests passed (exit code 0). Committed and pushed as `6f2672d`. |
+| 2026-10-31 | Milestone 4.2: Sales Domain Agent Foundation implemented. 321 tests passed (exit code 0). Committed and pushed as `3589b25`. |
+| 2026-10-31 | Milestone 4.3: CLI Intake Layer implemented. 334 tests passed (exit code 0). Committed and pushed as `5ad7461`. |
+| 2026-10-31 | Milestone 5.1: OpenRouter Provider implemented. 352 tests passed (exit code 0). |

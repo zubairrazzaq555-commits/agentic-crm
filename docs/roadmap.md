@@ -184,25 +184,26 @@ gantt
 
 ---
 
-## Phase 5 — Concrete Providers & Task/Model Router (NEXT)
+## Phase 5 — Concrete Providers & Task/Model Router (IN PROGRESS)
 
 **Goal:** Multiple real LLM providers with failover, and a router that selects the cheapest suitable method.
 
-### Milestone 5.1 — Local Provider (Ollama) (NEXT)
+### Milestone 5.1 — OpenRouter Provider
 | Item | Detail |
 |---|---|
-| **Work** | `OllamaProvider` implementing `BaseProvider`, connects to local Ollama HTTP API, model selection, timeout handling |
-| **Acceptance** | If Ollama is running locally with a model pulled, `generate()` returns a response. If Ollama is down, provider gracefully reports unhealthy. |
-| **Tests** | `test_ollama_provider.py` — mocked HTTP responses for success, timeout, unavailable; optional live test with `--run-live` |
+| **Work** | `OpenRouterProvider` implementing `BaseProvider` and integrated into `ProviderManager`. Communicates with OpenRouter OpenAI-compatible completions API, reads credentials from env/settings, configurable free model (`nvidia/nemotron-3.5-lightning:free`), token & latency tracking, availability check, key sanitization. |
+| **Acceptance** | `OpenRouterProvider` cleanly generates completions, handles rate limits/errors gracefully, redacts API keys in errors, integrates with `ProviderManager` health & circuit breaker. |
+| **Tests** | `test_openrouter_provider.py` — mocked HTTP responses for success, auth failure, rate-limit (429), server error (500), timeout, network errors, circuit breaker integration, secret protection (18 focused tests; 352 total regression tests passing) |
 | **Dependencies** | Milestone 2.1 |
+| **Status** | **COMPLETED** |
 
-### Milestone 5.2 — Cloud Providers (Gemini, Groq)
+### Milestone 5.2 — Local Provider (Ollama) / Additional Providers
 | Item | Detail |
 |---|---|
-| **Work** | `GeminiProvider`, `GroqProvider` implementing `BaseProvider`, API key from env, quota tracking from response headers, rate-limit detection |
-| **Acceptance** | Each provider works with a valid free-tier key; quota exhaustion is detected and handled; missing API key → provider disabled (not crashed) |
-| **Tests** | Mocked tests for success, rate-limit (429), quota exhaustion, auth failure; optional live tests |
-| **Dependencies** | Milestone 2.1 |
+| **Work** | Additional concrete providers (`OllamaProvider`, `GroqProvider`) implementing `BaseProvider`, local/cloud execution, rate limit and health checks. |
+| **Acceptance** | Providers report healthy when running, graceful degradation when unavailable. |
+| **Tests** | Mocked unit tests and optional live verification tests. |
+| **Dependencies** | Milestone 5.1 |
 
 ### Milestone 5.3 — Task/Model Router
 | Item | Detail |

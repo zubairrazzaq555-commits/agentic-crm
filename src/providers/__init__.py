@@ -14,6 +14,7 @@ from src.providers.exceptions import (
 from src.providers.health import CircuitBreaker, CircuitState, HealthStatus
 from src.providers.manager import ProviderManager
 from src.providers.mock_provider import MockProvider
+from src.providers.openrouter import OpenRouterProvider
 
 __all__ = [
     "BaseProvider",
@@ -21,6 +22,7 @@ __all__ = [
     "CircuitState",
     "HealthStatus",
     "MockProvider",
+    "OpenRouterProvider",
     "PaidProviderError",
     "ProviderError",
     "ProviderManager",
