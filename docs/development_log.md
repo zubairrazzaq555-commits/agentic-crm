@@ -43,7 +43,7 @@ PROGRESS
 │
 ├── Phase 5 — Concrete Providers & Routing (IN PROGRESS ⏳)
 │   ├── 5.1 OpenRouter Provider       ✅  (BaseProvider, OpenRouter API completions, free models, health checks)
-│   ├── 5.2 LLM-Assisted Orchestrator ⏳  (NEXT: Deterministic + OpenRouter LLM classification fallback)
+│   ├── 5.2 LLM-Assisted Orchestrator ✅  (Deterministic + OpenRouter LLM classification fallback)
 │   ├── 5.3 Concrete Providers        ⏳  (DEFERRED: Ollama local provider / Groq)
 │   └── 5.4 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
 │
@@ -52,7 +52,7 @@ PROGRESS
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 352 tests passed (exit code 0)
+**Last verified test count:** 392 tests passed (exit code 0)
 
 ---
 
@@ -71,30 +71,23 @@ PROGRESS
 | 4.2 Sales Domain Agent Foundation | SalesAgentState schema, deterministic sales subdomain classifier (`lead_management`, `opportunity_management`, `deal_management`, `general_sales`), decoupled subdomain handlers, compiled LangGraph StateGraph, sync/async SalesDomainAgent, Grandparent Orchestrator integration | `src/agents/sales/state.py`, `src/agents/sales/classifier.py`, `src/agents/sales/handlers.py`, `src/agents/sales/agent.py`, `src/agents/sales/__init__.py`, `src/agents/__init__.py` | `tests/test_sales_agent.py` (39 tests) |
 | 4.3 CLI Intake Layer | Command-line task intake: ArgumentParser (`argparse`), `submit_task` persistent task queue intake + DB lifecycle update (`PENDING -> RUNNING -> COMPLETED/FAILED`), Grandparent Orchestrator execution, `format_task_output` (text/json), `src/main.py` entrypoint | `src/cli/parser.py`, `src/cli/intake.py`, `src/cli/__init__.py`, `src/main.py` | `tests/test_cli.py` (13 tests) |
 | 5.1 OpenRouter Provider | First external AI provider conforming to `BaseProvider` & `ProviderManager`. Integrates OpenRouter OpenAI-compatible completions API, reads credentials securely from env/settings, configurable default model (`nvidia/nemotron-3.5-lightning:free`), health & availability checks, token/latency tracking, robust error mapping, and secret sanitization | `src/providers/openrouter.py`, `src/providers/__init__.py`, `src/config.py`, `.env.example`, `pyproject.toml` | `tests/test_openrouter_provider.py` (18 tests) |
+| 5.2 LLM-Assisted Orchestrator Classification | Added controlled LLM-assisted domain classification fallback to Grandparent Orchestrator. Deterministic classifier remains primary. If uncertain, queries OpenRouter via ProviderManager using configured model (`nvidia/nemotron-3.5-lightning:free`). Validates strictly to supported domains with safe fallback to 'unknown' on error or invalid output. | `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/orchestrator/state.py`, `src/agents/orchestrator/__init__.py` | `tests/test_orchestrator_llm.py` (40 tests) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.1 complete. Preparing for Milestone 5.2 — LLM-Assisted Orchestrator Classification (OpenRouter).
+**Active milestone:** Milestone 5.2 complete. Preparing for Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq).
 
-**Milestone 5.1 Status:** COMPLETE
-- Implemented **OpenRouterProvider** (`src/providers/openrouter.py`) implementing `BaseProvider` and integrated into `ProviderManager`.
-- Built async generation (`generate`) via OpenRouter `/chat/completions` endpoint with model overrides, parameter passthrough, and reasoning fallback.
-- Added provider availability check (`check_availability`) using `/models` endpoint without billable consumption.
-- Implemented robust error handling with automatic redaction of API keys from error messages, logs, and tracebacks.
-- Verified unit test suite with 18 mock-based tests (`httpx.MockTransport`) covering auth, rate limits, server errors, timeouts, and circuit breaker trip.
-- Completed controlled live verification with `nvidia/nemotron-3.5-lightning:free`.
-- Tested: 352 total regression tests passing (exit code 0). Committed and pushed as `84d9a56`.
-
-**Roadmap Realignment (Option A):**
-- Milestone 5.2 scheduled as **LLM-Assisted Orchestrator Classification (OpenRouter)**.
-- Deterministic classification remains the primary first step.
-- LLM classification serves as a controlled fallback/assist path when deterministic classification is uncertain.
-- Reuses existing `ProviderManager` and `OpenRouterProvider` with configured free model (`nvidia/nemotron-3.5-lightning:free`).
-- Orchestrator remains provider-agnostic through the provider abstraction.
-- Ollama and Groq concrete provider implementations remain deferred to Milestone 5.3.
-- Model Router remains deferred to Milestone 5.4.
+**Milestone 5.2 Status:** COMPLETE
+- Integrated **LLM-Assisted Domain Classification** into `GrandparentOrchestrator` as an optional fallback when deterministic classification is uncertain.
+- Preserved **Deterministic Classification** as primary: tasks with strong keyword signals or explicit overrides route immediately without calling the LLM.
+- Extended `OrchestratorState` with `classification_method` (`"deterministic"`, `"llm"`, `"fallback"`).
+- Wired through **ProviderManager** abstraction (`provider_manager.get_available_provider()`), keeping orchestrator completely decoupled from OpenRouter HTTP/API details.
+- Validated LLM responses strictly against `SUPPORTED_DOMAINS` (`sales`, `marketing`, `customer_service`, `data`, `unknown`), rejecting arbitrary output.
+- Robust failure handling: falls back gracefully to `unknown` upon provider errors, timeouts, empty responses, or malformed outputs.
+- Tested: 40 focused unit tests passing; 392 total regression tests passing (exit code 0).
+- Live API verification performed: 1 real test on OpenRouter with `nvidia/nemotron-3.5-lightning:free` correctly classified an ambiguous task as `sales` and routed to the Sales Domain Agent.
 
 ---
 
@@ -130,15 +123,15 @@ None currently.
 
 ## Next Step
 
-**Milestone 5.2 — LLM-Assisted Orchestrator Classification (OpenRouter)**
+**Milestone 5.3 — Local Provider (Ollama) / Additional Providers (Groq)**
 
-Introduce controlled LLM-assisted classification in Grandparent Orchestrator:
-- Deterministic classification remains the primary layer.
-- If deterministic classification is uncertain, optionally invoke LLM via `ProviderManager` → `OpenRouterProvider`.
-- Enforce strict validation of LLM output into allowed domain set: `sales`, `marketing`, `customer_service`, `data`, `unknown`.
-- Ensure safe degradation to `unknown` or deterministic baseline on provider failure, network outage, or invalid output.
-- Keep orchestrator provider-agnostic.
-- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.2
+Implement additional concrete providers implementing `BaseProvider`:
+- `OllamaProvider`: local SLM execution via Ollama HTTP API.
+- `GroqProvider`: cloud execution with fast inference.
+- Register into `ProviderManager` with health checks and rate limit handling.
+- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.3
+
+---
 
 ---
 
@@ -197,4 +190,5 @@ Resolution: <one-line description>
 | 2026-10-31 | Milestone 4.2: Sales Domain Agent Foundation implemented. 321 tests passed (exit code 0). Committed and pushed as `3589b25`. |
 | 2026-10-31 | Milestone 4.3: CLI Intake Layer implemented. 334 tests passed (exit code 0). Committed and pushed as `5ad7461`. |
 | 2026-10-31 | Milestone 5.1: OpenRouter Provider implemented. 352 tests passed (exit code 0). Committed and pushed as `84d9a56`. |
-| 2026-10-31 | Strategic Roadmap Realignment (Option A): Milestone 5.2 set to LLM-Assisted Orchestrator Classification (OpenRouter); Ollama/Groq deferred to Milestone 5.3. |
+| 2026-10-31 | Strategic Roadmap Realignment (Option A): Milestone 5.2 set to LLM-Assisted Orchestrator Classification (OpenRouter); Ollama/Groq deferred to Milestone 5.3. Committed and pushed as `c5ab420`. |
+| 2026-10-31 | Milestone 5.2: LLM-Assisted Orchestrator Classification implemented. 392 tests passed (exit code 0). |

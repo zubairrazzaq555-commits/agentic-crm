@@ -4,6 +4,9 @@ from src.agents.orchestrator.classifier import (
     DOMAIN_KEYWORDS,
     classifier_node,
     classify_domain,
+    classify_domain_confidence,
+    create_classifier_node,
+    llm_classify_domain,
     route_domain,
 )
 from src.agents.orchestrator.handlers import (
@@ -30,13 +33,15 @@ __all__ = [
     "OrchestratorState",
     "classifier_node",
     "classify_domain",
+    "classify_domain_confidence",
+    "create_classifier_node",
     "create_initial_orchestrator_state",
     "create_orchestrator_graph",
     "customer_service_handler_node",
     "data_handler_node",
+    "llm_classify_domain",
     "marketing_handler_node",
     "route_domain",
     "sales_handler_node",
     "unknown_handler_node",
 ]
-

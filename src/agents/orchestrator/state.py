@@ -18,6 +18,7 @@ class OrchestratorState(TypedDict, total=False):
     task_type: str
     input_payload: Dict[str, Any]
     classified_domain: str
+    classification_method: str  # "deterministic", "llm", or "fallback"
     execution_status: str
     delegation_result: Optional[Dict[str, Any]]
     error_message: Optional[str]
