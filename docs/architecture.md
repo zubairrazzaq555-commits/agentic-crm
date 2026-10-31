@@ -60,14 +60,14 @@ The CRM architecture is organized into a 4-level hierarchical model (fully detai
 Level 1: Grandparent Orchestrator (Top-Level Dispatcher & Lifecycle Manager)
   │ [IMPLEMENTED: Deterministic Classifier + OpenRouter LLM Fallback]
   │
-  ├──► Level 2: Sales Domain Agent (Parent) [PARTIALLY IMPLEMENTED]
-  │      ├──► Level 3: Lead Management Agent [PLANNED]
-  │      │      ├──► Level 4 Tools: Lead CRUD, Duplicate Detection, Phone/Email Validator
-  │      │      └──► Level 4 Sub-Agent: Lead Intent Extraction SLM
-  │      ├──► Level 3: Contact Management Agent [PLANNED]
-  │      ├──► Level 3: Account Management Agent [PLANNED]
-  │      ├──► Level 3: Opportunity Management Agent [PLANNED]
-  │      └──► Level 3: Deal Management Agent [PLANNED]
+  ├──► Level 2: Sales Domain Agent (Parent) [IMPLEMENTED: Real CRM Execution]
+  │      ├──► Level 3: Lead Management Subdomain [IMPLEMENTED via Handlers & Services]
+  │      │      ├──► Level 4 Tools: Lead CRUD, Qualification, Conversion Tools
+  │      │      └──► Level 4 Sub-Agent: Lead Intent Extraction (Deterministic Rule Engine)
+  │      ├──► Level 3: Contact Management Subdomain [IMPLEMENTED via Handlers & Services]
+  │      ├──► Level 3: Account Management Subdomain [IMPLEMENTED via Handlers & Services]
+  │      ├──► Level 3: Opportunity Management Subdomain [IMPLEMENTED via Handlers & Services]
+  │      └──► Level 3: Deal Management Subdomain [IMPLEMENTED via Handlers & Services]
   │
   ├──► Level 2: Marketing Domain Agent (Parent) [PLACEHOLDER]
   │      ├──► Level 3: Campaign Management Agent [PLANNED]
@@ -181,14 +181,21 @@ To ensure reliable operation on standard laptops without requiring a dedicated G
 - **Circuit breaker:** After N consecutive failures, mark provider as "down" for a cooldown period.
 - **Strict policy:** A provider's `is_paid` flag is checked before every call. Paid providers are **never** selected automatically.
 
-### 4.8 Persistence Layer
-- **SQLite database** with well-defined schemas.
-- **Key tables (initial):**
-  - `tasks` — id, type, domain, status, payload, result, created_at, updated_at, retry_count, idempotency_key
-  - `task_queue` — task_id, priority, scheduled_at, picked_at, worker_id
-  - `providers` — name, type, config, quota_remaining, rate_limit_reset_at, is_healthy, is_paid
-  - `audit_log` — timestamp, actor (agent/tool), action, task_id, details
-  - `leads` (Phase 5+) — first CRM entity
+### 4.8 Persistence Layer & CRM Core Database
+- **SQLite database** with well-defined schemas managed via SQLAlchemy Core and `aiosqlite`.
+- **Foreign Keys:** Enabled on every SQLite connection via `PRAGMA foreign_keys = ON;`.
+- **System & Orchestration Tables:**
+  - `tasks` — task lifecycle (`id`, `task_type`, `domain`, `status`, `priority`, `payload`, `result`, `retry_count`, `idempotency_key`, `created_at`, `updated_at`, `started_at`, `completed_at`)
+- **CRM Business Entity Tables (Milestone 5.4 Foundation):**
+  - `leads` — prospect records (`id`, `first_name`, `last_name`, `company`, `email`, `phone`, `title`, `status`, `source`, `score`, `notes`, `created_at`, `updated_at`)
+  - `accounts` — company accounts (`id`, `name` [unique], `industry`, `website`, `phone`, `tier`, `annual_revenue`, `billing_city`, `billing_country`, `status`, `created_at`, `updated_at`)
+  - `contacts` — individuals linked to accounts (`id`, `account_id` [FK `accounts.id` ON DELETE SET NULL], `first_name`, `last_name`, `email`, `phone`, `title`, `department`, `is_primary`, `created_at`, `updated_at`)
+  - `opportunities` — sales pipeline opportunities (`id`, `account_id` [FK `accounts.id` ON DELETE CASCADE], `primary_contact_id` [FK `contacts.id` ON DELETE SET NULL], `name`, `stage`, `amount`, `probability`, `close_date`, `created_at`, `updated_at`)
+  - `deals` — commercial quotes and closed transactions (`id`, `opportunity_id` [FK `opportunities.id` ON DELETE CASCADE], `name`, `deal_value`, `discount_percentage`, `final_amount`, `status`, `payment_terms`, `contract_start_date`, `contract_end_date`, `closed_at`, `created_at`, `updated_at`)
+- **Layered Architecture:**
+  - **Repositories:** `LeadRepository`, `AccountRepository`, `ContactRepository`, `OpportunityRepository`, `DealRepository` (CRUD, Search, Pagination).
+  - **Services:** `LeadService`, `AccountService`, `ContactService`, `OpportunityService`, `DealService` (Business rules, validations, qualification, conversion workflows).
+  - **Deterministic Tools:** Pure Python async functions (`create_lead_tool`, `qualify_lead_tool`, `convert_lead_tool`, `create_account_tool`, `create_opportunity_tool`, `create_deal_tool`, etc.) callable by agents without LLM overhead.
 - **Idempotency:** Every task with external side effects carries an idempotency key. Before executing, the system checks if the key was already processed.
 
 ---

@@ -17,11 +17,24 @@ SALES_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
         "qualify",
         "qualification",
         "intake",
-        "contact",
         "route",
         "routing",
         "assign",
         "assignment",
+    },
+    "contact_management": {
+        "contact",
+        "contacts",
+        "individual",
+        "person",
+        "stakeholder",
+    },
+    "account_management": {
+        "account",
+        "accounts",
+        "company_account",
+        "organization",
+        "firm",
     },
     "opportunity_management": {
         "opportunity",
@@ -56,7 +69,6 @@ SALES_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
     "general_sales": {
         "sales",
         "sale",
-        "account",
         "revenue",
         "rep",
         "quota",
@@ -140,6 +152,8 @@ def classify_sales_task(task_type: str, payload: Optional[Dict[str, Any]] = None
     # 5. Check specialized categories first to prevent broad terms from overriding subdomains
     specialized_categories = [
         "lead_management",
+        "contact_management",
+        "account_management",
         "opportunity_management",
         "deal_management",
     ]

@@ -17,6 +17,21 @@ from src.core.task import (
 from src.database.connection import DatabaseManager
 
 
+def _sanitize_for_serialization(data: Any) -> Any:
+    """Ensure data is JSON-serializable by converting datetimes and stripping un-serializable references."""
+    if hasattr(data, "isoformat"):
+        return data.isoformat()
+    if isinstance(data, dict):
+        return {
+            k: _sanitize_for_serialization(v)
+            for k, v in data.items()
+            if not k.startswith("_") and not isinstance(v, DatabaseManager)
+        }
+    if isinstance(data, list):
+        return [_sanitize_for_serialization(x) for x in data]
+    return data
+
+
 async def submit_task(
     description: str,
     task_type: Optional[str] = None,
@@ -76,30 +91,43 @@ async def submit_task(
         await update_task_status(db, task_id, TaskStatus.RUNNING)
 
         # 3. Execute through Grandparent Orchestrator
+        runtime_payload = dict(task_payload)
+        runtime_payload["_db"] = db
+        runtime_payload["db_url"] = db.database_url
         orch_state = await orch.aexecute(
             task_id=task_id,
             task_type=effective_task_type,
-            input_payload=task_payload,
+            input_payload=runtime_payload,
         )
 
         # 4. Determine outcome and finalize DB status
         execution_status = orch_state.get("execution_status", "FAILED")
+        sanitized_state = _sanitize_for_serialization(orch_state)
         if execution_status == "SUCCESS":
             final_task_status = TaskStatus.COMPLETED
             await update_task_status(
                 db,
                 task_id,
                 TaskStatus.COMPLETED,
-                result=orch_state,
+                result=sanitized_state,
             )
         else:
             final_task_status = TaskStatus.FAILED
-            err = orch_state.get("error_message") or "Orchestrator execution failed"
+            err = (
+                orch_state.get("error_message")
+                or (
+                    orch_state.get("delegation_result", {})
+                    .get("sales_agent_result", {})
+                    .get("handler_result", {})
+                    .get("error")
+                )
+                or "Orchestrator execution failed"
+            )
             await update_task_status(
                 db,
                 task_id,
                 TaskStatus.FAILED,
-                result={"error": err},
+                result={"error": err, "details": sanitized_state},
             )
 
         # 5. Build consolidated execution summary
@@ -130,7 +158,7 @@ def format_task_output(summary: Dict[str, Any], as_json: bool = False) -> str:
         Formatted string for terminal display.
     """
     if as_json:
-        return json.dumps(summary, indent=2, default=str)
+        return json.dumps(_sanitize_for_serialization(summary), indent=2, default=str)
 
     task_id = summary.get("task_id", "")
     task_type = summary.get("task_type", "")
@@ -160,9 +188,23 @@ def format_task_output(summary: Dict[str, Any], as_json: bool = False) -> str:
         hr = sales_result.get("handler_result") or {}
         sub_handler = hr.get("handler", "N/A")
         sub_details = hr.get("details", "")
+        operation = hr.get("operation")
+        op_success = hr.get("success")
+        record_id = hr.get("record_id")
+        error_msg = hr.get("error")
+
         lines.append(f"  Sales Subdomain: {category} ({sub_handler})")
+        if operation:
+            lines.append(f"  Operation:       {operation}")
+        if op_success is not None:
+            op_outcome = "SUCCESS" if op_success else "FAILED"
+            lines.append(f"  Operation Outcome: {op_outcome}")
+        if record_id:
+            lines.append(f"  Record ID:       {record_id}")
         if sub_details:
             lines.append(f"  Action Details:  {sub_details}")
+        if error_msg:
+            lines.append(f"  Error:           {error_msg}")
     elif details:
         lines.append(f"Details:           {details}")
 

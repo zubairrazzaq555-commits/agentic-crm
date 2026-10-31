@@ -41,19 +41,21 @@ PROGRESS
 │   ├── 4.2 Sales Domain Agent        ✅  (Sales subdomain classifier, StateGraph, subdomain handlers)
 │   └── 4.3 CLI Intake Layer          ✅  (argparse, DB task lifecycle, orchestrator execution)
 │
-├── Phase 5 — Concrete Providers & Routing (IN PROGRESS ⏳)
+├── Phase 5 — Concrete Providers, CRM Foundation & Routing (IN PROGRESS ⏳)
 │   ├── 5.1 OpenRouter Provider       ✅  (BaseProvider, OpenRouter API completions, free models, health checks)
 │   ├── 5.2 LLM-Assisted Orchestrator ✅  (Deterministic + OpenRouter LLM classification fallback)
 │   ├── 5.3 Hierarchy Design          ✅  (4 levels, 20 specialist agents, tools vs agents, 8GB/16GB RAM strategy)
-│   ├── 5.4 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
-│   └── 5.5 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
+│   ├── 5.4 CRM Core DB & Sales Data  ✅  (Leads, Accounts, Contacts, Opps, Deals schemas, repos, services, tools)
+│   ├── 5.5 Sales Agent Execution     ✅  (Real CRM operations, intent extraction, graph integration, CLI execution)
+│   ├── 5.6 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
+│   └── 5.7 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
 ├── Phase 7 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 392 tests passed (exit code 0)
+**Last verified test count:** 425 tests passed (exit code 0)
 
 ---
 
@@ -74,21 +76,29 @@ PROGRESS
 | 5.1 OpenRouter Provider | First external AI provider conforming to `BaseProvider` & `ProviderManager`. Integrates OpenRouter OpenAI-compatible completions API, reads credentials securely from env/settings, configurable default model (`nvidia/nemotron-3.5-lightning:free`), health & availability checks, token/latency tracking, robust error mapping, and secret sanitization | `src/providers/openrouter.py`, `src/providers/__init__.py`, `src/config.py`, `.env.example`, `pyproject.toml` | `tests/test_openrouter_provider.py` (18 tests) |
 | 5.2 LLM-Assisted Orchestrator Classification | Added controlled LLM-assisted domain classification fallback to Grandparent Orchestrator. Deterministic classifier remains primary. If uncertain, queries OpenRouter via ProviderManager using configured model (`nvidia/nemotron-3.5-lightning:free`). Validates strictly to supported domains with safe fallback to 'unknown' on error or invalid output. | `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/orchestrator/state.py`, `src/agents/orchestrator/__init__.py` | `tests/test_orchestrator_llm.py` (40 tests) |
 | 5.3 Complete CRM Agent Hierarchy Design | Designed 4-level enterprise CRM Agent Hierarchy (`docs/CRM_AGENT_HIERARCHY.md`): Level 1 Orchestrator, Level 2 Domain Agents (Sales, Marketing, Service, Data), Level 3 Specialist Child Agents (20 total, 5 per domain), Level 4 Sub-specialists vs Deterministic Tools. Established strict rule: CRUD/SQL/calculations must never invoke models. Defined 8GB (≤1.5B model, ≤2.2GB RAM) and 16GB (≤3.8B model, ≤5.5GB RAM) memory budgets and SLM-first local execution roadmap. | `docs/CRM_AGENT_HIERARCHY.md`, `docs/architecture.md`, `docs/roadmap.md`, `docs/AGENT_HIERARCHY_AUDIT.md` | Zero regression (392 tests passing) |
+| 5.4 CRM Core Database & Sales Data Foundation | Foundational CRM database architecture for Sales domain: Leads, Accounts, Contacts, Opportunities, and Deals. Enabled foreign key enforcement in SQLite (`PRAGMA foreign_keys = ON;`), relational cascades, unique constraints, and schema registration via `metadata.create_all()`. Created clean Repositories (`LeadRepository`, `AccountRepository`, `ContactRepository`, `OpportunityRepository`, `DealRepository`), Services (`LeadService`, `AccountService`, `ContactService`, `OpportunityService`, `DealService`), and deterministic Level 4 Python tools (`create_lead_tool`, `qualify_lead_tool`, `convert_lead_tool`, `create_account_tool`, `create_deal_tool`, etc.). Bound services to `SalesDomainAgent`. | `src/crm/models.py`, `src/crm/repositories/`, `src/crm/services/`, `src/crm/tools/`, `src/crm/__init__.py`, `src/database/connection.py`, `src/agents/sales/` | `tests/test_crm_database.py`, `tests/test_crm_repositories.py`, `tests/test_crm_services.py`, `tests/test_crm_tools.py` (33 new tests, 425 total passing) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.3 complete. Preparing for Milestone 5.4 — Local Provider (Ollama / Local SLM).
+**Active milestone:** Milestone 5.5 complete. Preparing for Milestone 5.6 — Local Provider (Ollama / Local SLM).
 
-**Milestone 5.3 Status:** COMPLETE
-- Formalized complete 4-tier Salesforce-like agent architecture in `docs/CRM_AGENT_HIERARCHY.md`.
-- Specified 20 Level 3 Specialist Child Agents across 4 domains (Sales, Marketing, Customer Service, Data & Analytics).
-- Codified strict boundaries: deterministic Python tools for all CRUD, schema lookups, and arithmetic; SLM/LLMs exclusively reserved for cognitive/unstructured tasks.
-- Defined local hardware operational profiles for standard 8GB and 16GB RAM laptops (model footprint limits, lazy-loading lifecycle, CPU inference).
-- Documented inter-agent message schema (`AgentMessage`), task delegation protocols, and SQLite CRM entity schema.
-- Aligned `docs/architecture.md` and `docs/roadmap.md` to reflect the 4-level hierarchy and updated milestone sequence.
-- All 392 existing regression tests remain intact and passing (exit code 0).
+**Milestone 5.5 Status:** COMPLETE
+- Implemented deterministic intent parser (`extract_sales_intent`) in `src/agents/sales/intent.py` supporting all 5 Sales subdomains:
+  - Lead Management (`create_lead`, `search_leads`, `qualify_lead`, `convert_lead`)
+  - Contact Management (`create_contact`, `search_contacts`)
+  - Account Management (`create_account`, `search_accounts`, `account_summary`)
+  - Opportunity Management (`create_opportunity`, `search_opportunities`, `advance_stage`)
+  - Deal Management (`create_deal`, `search_deals`, `close_deal`)
+- Expanded `SalesDomainAgent` LangGraph topology to include dedicated nodes and conditional edges for `contact_handler` and `account_handler`.
+- Connected all Sales subdomain handlers to real CRM services and deterministic Level 4 Python tools against SQLite.
+- Preserved Grandparent Orchestrator delegation contract (`execution_status = "SUCCESS"` upon delegation completion, with actual CRM result stored in `delegation_result["sales_agent_result"]`).
+- Maintained backward compatibility for legacy abstract tasks and CLI tests without regressions.
+- Ensured event loop safety for SQLAlchemy `AsyncEngine` across async/sync thread boundaries.
+- Updated CLI intake layer (`submit_task`, `format_task_output`) with JSON serialization of datetimes and human-readable CRM execution reporting.
+- Added comprehensive test suite in `tests/test_sales_execution.py` (16 tests).
+- All 441 tests passing (100% pass rate, exit code 0).
 
 ---
 
@@ -105,10 +115,12 @@ None currently.
 | Python version | 3.13 (runtime), 3.11+ compatible | Broad compatibility |
 | Database | SQLite via aiosqlite | Zero-install, file-based, dev-appropriate |
 | ORM | SQLAlchemy Core (no ORM) | Type safety without overhead |
-| Async | Full asyncio | Needed for concurrent provider calls |
+| SQLite Foreign Keys | Enabled via PRAGMA foreign_keys = ON connection event listener | Enforces referential integrity and ON DELETE CASCADE / SET NULL |
+| CRM Architecture | 3-tier: Repositories -> Services -> Tools | Clean separation of persistence, business rules, and agent-callable functions |
+| Async | Full asyncio | Needed for concurrent provider calls and async DB operations |
 | LangGraph | Core state-machine layer | Graph-based orchestration for orchestrator & domain agents |
 | Graph State | TypedDict (`total=False`) | Canonical LangGraph pattern for partial state updates |
-| DB / Graph Isolation | TaskExecutor coordinator | Keeps graph nodes pure; database operations stay outside graphs |
+| DB / Graph Isolation | TaskExecutor coordinator & Level 4 Tools | Keeps graph nodes pure; database operations stay outside graphs |
 | Parallel State Reducer | `Annotated[List, operator.add]` | Prevents state update conflicts during parallel fan-in |
 | Loop Safety | Explicit max iterations ceiling | Prevents graph infinite execution loops under any condition |
 | First External Provider | OpenRouter | Multi-model catalog, OpenAI-compatible API, free models |
@@ -116,25 +128,27 @@ None currently.
 | Secret Sanitization | Redact API key in all errors & exceptions | Eliminates risk of secret leakage in logs/traces |
 | First LLM Integration | Grandparent Orchestrator fallback | Deterministic first; LLM only assists when uncertain |
 | Provider Decoupling | Use ProviderManager abstraction | Orchestrator never directly couples to OpenRouter endpoint |
-| First CRM domain | Leads | Most self-contained workflow |
+| First CRM domain | Leads & Sales | Most self-contained workflow |
 | License | MIT | Simple, permissive |
 | Cost policy | $0 ceiling | Never auto-escalate to paid APIs |
 | Hierarchy Architecture | 4-Level Model (Orchestrator → Domain → Specialist → Tools/Sub-agents) | Separates concerns cleanly; matches enterprise CRM structures (Salesforce) |
 | Deterministic Tool Boundary | CRUD/SQL/Calculations strictly Python tools | Never waste model tokens or introduce hallucination risk for simple data operations |
 | SLM-First Local Strategy | Small models (≤1.5B on 8GB RAM, ≤3.8B on 16GB RAM) | Enables complete offline operation on commodity laptops without cloud lock-in |
 | Memory Management | Lazy model loading & single-model concurrency | Keeps memory within strict 2.2GB (8GB RAM) and 5.5GB (16GB RAM) budgets |
+| Subdomain Handler Status Contract | `status: "COMPLETED" if success else "FAILED"`, `success: bool`, `error: Optional[str]` | Aligns with LangGraph node completion while distinguishing business logic outcome |
+| Orchestrator Delegation Contract | `execution_status: "SUCCESS"` on completed delegation, nested `sales_agent_result` for domain outcome | Decouples pipeline delegation health from domain-level CRM operation results |
 
 ---
 
 ## Next Step
 
-**Milestone 5.4 — Local Provider (Ollama / Local SLMs)**
+**Milestone 5.6 — Local Provider (Ollama / Local SLMs)**
 
 Implement `OllamaProvider` conforming to `BaseProvider`:
 - Local SLM execution via Ollama HTTP API.
 - Support for target lightweight models (Qwen2.5-1.5B, Phi-3-mini 3.8B).
 - Register into `ProviderManager` with health check, availability detection, and zero-cloud fallback.
-- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.4
+- Reference: `docs/roadmap.md` → Phase 5, Milestone 5.6
 
 ---
 
@@ -198,4 +212,6 @@ Resolution: <one-line description>
 | 2026-10-31 | Milestone 5.1: OpenRouter Provider implemented. 352 tests passed (exit code 0). Committed and pushed as `84d9a56`. |
 | 2026-10-31 | Strategic Roadmap Realignment (Option A): Milestone 5.2 set to LLM-Assisted Orchestrator Classification (OpenRouter); Ollama/Groq deferred to Milestone 5.3. Committed and pushed as `c5ab420`. |
 | 2026-10-31 | Milestone 5.2: LLM-Assisted Orchestrator Classification implemented. 392 tests passed (exit code 0). Committed and pushed as `3d31dda`. |
-| 2026-10-31 | Milestone 5.3: Complete CRM Agent Hierarchy Design implemented (`docs/CRM_AGENT_HIERARCHY.md`). 392 tests passed (exit code 0). |
+| 2026-10-31 | Milestone 5.3: Complete CRM Agent Hierarchy Design implemented (`docs/CRM_AGENT_HIERARCHY.md`). 392 tests passed (exit code 0). Committed and pushed as `4196f50`. |
+| 2026-10-31 | Milestone 5.4: CRM Core Database & Sales Data Foundation implemented (Leads, Accounts, Contacts, Opps, Deals schemas, repos, services, tools). 425 tests passed (exit code 0). |
+| 2026-10-31 | Milestone 5.5: Sales Agent Execution & CRM Integration implemented (real CRM operations, intent extraction, LangGraph integration, CLI execution). 441 tests passed (exit code 0). |

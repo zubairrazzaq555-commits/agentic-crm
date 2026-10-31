@@ -23,16 +23,17 @@
     - Milestone 4.1: Grandparent Orchestrator Graph ✅
     - Milestone 4.2: Sales Domain Agent Sub-Graph ✅
     - Milestone 4.3: CLI Intake Layer ✅
-  - **Phase 5 — Concrete Providers & Routing**:
+  - **Phase 5 — Concrete Providers, CRM Foundation & Routing**:
     - Milestone 5.1: OpenRouter Provider ✅
     - Milestone 5.2: LLM-Assisted Orchestrator Classification (OpenRouter) ✅
     - Milestone 5.3: Complete CRM Agent Hierarchy Design ✅
+    - Milestone 5.4: CRM Core Database & Sales Data Foundation ✅
 - **CURRENT**:
-  - Phase 5 in progress. Milestone 5.3 (Hierarchy Design) complete.
+  - Phase 5 in progress. Milestone 5.4 (CRM Core Database & Sales Data Foundation) complete.
 - **NEXT**:
-  - **Phase 5 — Concrete Providers & Routing**:
-    - Milestone 5.4: Local Provider (Ollama / Local SLM) (NEXT)
-    - Milestone 5.5: Task / Model Router (DEFERRED)
+  - **Phase 5 — Concrete Providers, CRM Foundation & Routing**:
+    - Milestone 5.5: Local Provider (Ollama / Local SLM) (NEXT)
+    - Milestone 5.6: Task / Model Router (DEFERRED)
 - **FUTURE (Re-sequenced)**:
   - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
   - **Phase 7 — First CRM Feature**: Leads CRUD, rule-based scoring, Sales Agent integration
@@ -218,7 +219,25 @@ gantt
 | **Dependencies** | Milestone 4.2, Milestone 5.2 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.4 — Local Provider (Ollama / Local SLMs) (NEXT)
+### Milestone 5.4 — CRM Core Database & Sales Data Foundation ✅
+| Item | Detail |
+|---|---|
+| **Work** | Foundational CRM database architecture, repositories, business logic services, and deterministic Python tools for the Sales domain: Leads, Accounts, Contacts, Opportunities, and Deals. Enabled foreign key enforcement in SQLite (`PRAGMA foreign_keys = ON;`), relational cascades, unique constraints, and schema registration via `metadata.create_all()`. Created clean `LeadRepository`, `AccountRepository`, `ContactRepository`, `OpportunityRepository`, and `DealRepository` for async CRUD, search, and pagination. Built `LeadService` (intake validation, score thresholds, conversion to Account/Contact/Opp), `AccountService` (tier rules, pipeline summaries), `ContactService` (email validation, account linking), `OpportunityService` (stage advancement, probability synchronization), and `DealService` (pricing math, closing synchronization with opportunities). Created deterministic Level 4 Python tools (`create_lead_tool`, `qualify_lead_tool`, `convert_lead_tool`, `create_account_tool`, `create_deal_tool`, etc.) callable by agents without LLM overhead. Bound services to `SalesDomainAgent`. |
+| **Acceptance** | All 5 entity schemas created; foreign keys and cascade rules verified; repositories, services, and deterministic tools fully operational; 33 focused unit/integration tests passing; full regression suite passing (425 passed). |
+| **Tests** | `tests/test_crm_database.py`, `tests/test_crm_repositories.py`, `tests/test_crm_services.py`, `tests/test_crm_tools.py` (33 new tests, 425 total regression tests passing). |
+| **Dependencies** | Milestone 1.2, Milestone 4.2, Milestone 5.3 |
+| **Status** | **COMPLETED** |
+
+### Milestone 5.5 — Sales Agent Execution & CRM Integration ✅
+| Item | Detail |
+|---|---|
+| **Work** | Connect the existing Sales Domain Agent to execute real CRM operations against the core database, repositories, services, and deterministic Level 4 Python tools. Implemented deterministic sales intent parsing (`extract_sales_intent`) covering all 5 sales subdomains (Leads, Contacts, Accounts, Opportunities, Deals) without model inference. Updated `SalesDomainAgent` LangGraph state graph with dedicated `contact_handler` and `account_handler` nodes, conditional edge routing, and automatic database connection injection (`_prepare_payload`). Connected `GrandparentOrchestrator` sales delegation to propagate real execution status (`SUCCESS` / `FAILED`) and structured CRM results. Updated CLI intake layer (`submit_task`, `format_task_output`) to execute end-to-end against SQLite persistence and display formatted task results with domain, subdomain, operation, status, and CRM record IDs. |
+| **Acceptance** | Sales tasks execute actual CRUD, qualification, conversion, and stage advancement in SQLite; CLI intake correctly runs tasks through queue, orchestrator, domain agent, and tools; structured results returned; ambiguous/unsupported requests gracefully fail without exceptions; full test coverage. |
+| **Tests** | `tests/test_sales_execution.py` — unit and integration tests for intent parsing, lead/contact/account/opportunity/deal handlers, error handling, and end-to-end CLI task intake (16 focused tests). |
+| **Dependencies** | Milestone 4.2, Milestone 4.3, Milestone 5.4 |
+| **Status** | **COMPLETED** |
+
+### Milestone 5.6 — Local Provider (Ollama / Local SLMs) (NEXT)
 | Item | Detail |
 |---|---|
 | **Work** | Implement `OllamaProvider` conforming to `BaseProvider` for local SLM execution. Target efficient small models suited for 8GB RAM laptops (Qwen2.5-1.5B, Llama-3.2-1B) and 16GB RAM laptops (Phi-3-mini 3.8B, Qwen2.5-3B). Add optional cloud fast-inference provider (`GroqProvider`). Register into `ProviderManager` with health checks, rate limit handling, and zero-cloud fallback. |
@@ -227,13 +246,13 @@ gantt
 | **Dependencies** | Milestone 5.1, Milestone 5.3 |
 | **Status** | **NEXT** |
 
-### Milestone 5.5 — Task / Model Router
+### Milestone 5.7 — Task / Model Router
 | Item | Detail |
 |---|---|
 | **Work** | `ModelRouter` with capability levels (DETERMINISTIC, ML, LOCAL_SLM, CLOUD_LLM, CLOUD_LLM_CAPABLE), routing logic that queries `ProviderManager` for availability, fallback chain, strict no-paid policy |
 | **Acceptance** | Router selects lowest-cost available method; falls back correctly when providers are down; never selects a paid provider; deterministic tasks bypass LLM entirely |
 | **Tests** | `test_model_router.py` — routing decisions with various provider availability scenarios, capability matching, paid-provider rejection |
-| **Dependencies** | Milestones 5.1–5.4 |
+| **Dependencies** | Milestones 5.1–5.6 |
 | **Status** | **DEFERRED** |
 
 ---

@@ -36,11 +36,13 @@ def sales_handler_node(
 ) -> Dict[str, Any]:
     """Domain Handler: Dispatches sales tasks to the Sales Domain Agent."""
     step = state.get("step", 0)
-    agent = sales_agent or SalesDomainAgent()
+    input_payload = state.get("input_payload") or {}
+    db = input_payload.get("_db")
+    agent = sales_agent or SalesDomainAgent(db=db)
     sales_result = agent.execute(
         task_id=state.get("task_id", ""),
         task_type=state.get("task_type", ""),
-        input_payload=state.get("input_payload", {}),
+        input_payload=input_payload,
     )
     delegation = _build_delegation_payload(
         domain="sales",

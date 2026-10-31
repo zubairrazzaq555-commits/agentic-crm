@@ -23,9 +23,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, event
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 # ---------------------------------------------------------------------------
@@ -116,6 +116,12 @@ class DatabaseManager:
                 self._database_url,
                 echo=False,
             )
+            if "sqlite" in self._database_url.lower():
+                @event.listens_for(self._engine.sync_engine, "connect")
+                def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
 
         # Create all tables registered in metadata.
         # In this milestone there are no tables yet, but this ensures

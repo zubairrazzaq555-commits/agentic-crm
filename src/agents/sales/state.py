@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional, TypedDict
 
 SUPPORTED_SALES_CATEGORIES = (
     "lead_management",
+    "contact_management",
+    "account_management",
     "opportunity_management",
     "deal_management",
     "general_sales",
