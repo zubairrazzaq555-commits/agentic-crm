@@ -48,9 +48,9 @@ PROGRESS
 │   ├── 5.4 CRM Core DB & Sales Data  ✅  (Leads, Accounts, Contacts, Opps, Deals schemas, repos, services, tools)
 │   ├── 5.5 Sales Agent Execution     ✅  (Real CRM operations, intent extraction, graph integration, CLI execution)
 │   ├── 5.6 Execution Mode & Models   ✅  (ExecutionMode, ModelTier, TaskComplexity, ModelDescriptor, settings guards)
-│   ├── 5.7 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
-│   ├── 5.8 Task-to-Model Router      ⏳  (Capability-based routing & fallback chain)
-│   ├── 5.9 RAM & Lifecycle Mgr       ⏳  (ModelLifecycleManager, load/unload)
+│   ├── 5.7 Local Provider (Ollama)   ✅  (OllamaProvider, local SLM execution, model detection, zero cost)
+│   ├── 5.8 RAM & Lifecycle Mgr       ⏳  (NEXT: ModelLifecycleManager, single-residency load/unload)
+│   ├── 5.9 Task-to-Model Router      ⏳  (Capability-based routing & fallback chain)
 │   └── 5.10 Hybrid Benchmarks        ⏳  (End-to-end routing benchmarks)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
@@ -58,7 +58,7 @@ PROGRESS
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 461 tests passed (exit code 0)
+**Last verified test count:** 484 tests passed (exit code 0)
 
 ---
 
@@ -82,12 +82,30 @@ PROGRESS
 | 5.4 CRM Core Database & Sales Data Foundation | Foundational CRM database architecture for Sales domain: Leads, Accounts, Contacts, Opportunities, and Deals. Enabled foreign key enforcement in SQLite (`PRAGMA foreign_keys = ON;`), relational cascades, unique constraints, and schema registration via `metadata.create_all()`. Created clean Repositories (`LeadRepository`, `AccountRepository`, `ContactRepository`, `OpportunityRepository`, `DealRepository`), Services (`LeadService`, `AccountService`, `ContactService`, `OpportunityService`, `DealService`), and deterministic Level 4 Python tools (`create_lead_tool`, `qualify_lead_tool`, `convert_lead_tool`, `create_account_tool`, `create_deal_tool`, etc.). Bound services to `SalesDomainAgent`. | `src/crm/models.py`, `src/crm/repositories/`, `src/crm/services/`, `src/crm/tools/`, `src/crm/__init__.py`, `src/database/connection.py`, `src/agents/sales/` | `tests/test_crm_database.py`, `tests/test_crm_repositories.py`, `tests/test_crm_services.py`, `tests/test_crm_tools.py` (33 new tests, 425 total passing) |
 | 5.5 Sales Agent Execution | Real CRM sales operations executed via SalesDomainAgent, deterministic intent routing across all 5 sales subdomains, Grandparent Orchestrator integration, CLI intake execution, datetimes serialization | `src/agents/sales/intent.py`, `src/agents/sales/agent.py`, `src/agents/sales/handlers.py`, `src/agents/orchestrator/handlers.py`, `src/cli/intake.py` | `tests/test_sales_execution.py` (16 tests, 441 total passing) |
 | 5.6 Execution Mode & Model Capability Foundation | Local-first / API-optional / Cost-optimized foundation: ExecutionMode (LOCAL, CLOUD, HYBRID), ModelTier (SLM_SMALL, SLM_MEDIUM, LLM_LARGE), TaskComplexity (DETERMINISTIC, EXTRACTION, CLASSIFICATION, REASONING, PLANNING), ModelDescriptor, optional capability metadata on BaseProvider, strict local isolation guards (LOCAL mode forbids cloud calls; HYBRID requires explicit opt-in for cloud fallback; paid APIs strictly disabled) | `src/config.py`, `src/providers/base.py`, `src/providers/mock_provider.py`, `src/providers/openrouter.py`, `src/providers/__init__.py` | `tests/test_model_capability.py` (20 new tests, 461 total passing) |
+| 5.7 Local Provider (Ollama) | OllamaProvider implementation conforming to BaseProvider: async generation via httpx (/api/generate), health checking (/api/version, /api/tags), installed model detection (list_models, is_model_available), ModelDescriptor inference (SLM_SMALL/MEDIUM/LARGE), $0 local cost ceiling, ProviderManager registration, LOCAL mode compatibility | `src/providers/ollama.py`, `src/providers/__init__.py`, `src/config.py` | `tests/test_ollama_provider.py` (23 new tests, 484 total passing) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.6 complete (461 passing tests). Ready for Milestone 5.7 — Local SLM Provider (Ollama).
+**Active milestone:** Milestone 5.7 complete (484 passing tests). Ready for Milestone 5.8 — RAM-Aware Memory Lifecycle Manager.
+
+**Milestone 5.7 Status:** COMPLETE
+- Implemented `OllamaProvider` conforming to `BaseProvider` in `src/providers/ollama.py`:
+  - Full asynchronous communication via `httpx.AsyncClient` with injected client support for isolated testing.
+  - Configurable endpoints (`OLLAMA_BASE_URL`), default models (`OLLAMA_DEFAULT_MODEL`), and timeouts (`OLLAMA_TIMEOUT`).
+  - Text generation (`generate()`) submitting to `/api/generate` with stream=False, options, and structured format support.
+  - Multi-endpoint health checking (`check_availability()`) querying `/api/version` with graceful fallback to `/api/tags`.
+  - Installed model detection (`list_models()`) and model availability verification (`is_model_available()`) supporting tag-alias matching.
+  - Standardized `ProviderResult` output with accurate token counting (`prompt_eval_count`, `eval_count`) and execution latency.
+  - Tier and resource inference in `ModelDescriptor` (e.g., `SLM_SMALL` ~2GB RAM for 1B-3B, `SLM_MEDIUM` ~5GB RAM for 7B-14B).
+  - Explicit local flag (`is_local=True`) and $0 cost ceiling (`is_paid=False`).
+  - Graceful exception mapping for offline daemon, timeouts, 404 missing models, and HTTP 500 errors.
+- Added `ollama_timeout` to `Settings` in `src/config.py` and included in `safe_summary()`.
+- Exported `OllamaProvider` in `src/providers/__init__.py`.
+- Verified seamless registration in `ProviderManager` with health tracking, circuit breaker, and coexistence with `MockProvider` and `OpenRouterProvider`.
+- Added comprehensive unit tests in `tests/test_ollama_provider.py` (23 tests, 100% mocked, zero network requirement).
+- Verified full test suite: 484/484 passed (0 failures).
 
 **Milestone 5.6 Status:** COMPLETE
 - Implemented `ExecutionMode` enum (`LOCAL`, `CLOUD`, `HYBRID`) in `src/config.py`.

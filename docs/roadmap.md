@@ -30,12 +30,12 @@
     - Milestone 5.4: CRM Core Database & Sales Data Foundation ✅
     - Milestone 5.5: Sales Agent Execution & CRM Integration ✅
     - Milestone 5.6: Execution Mode & Model Capability Foundation ✅
+    - Milestone 5.7: Local Provider Implementation (Ollama) ✅
 - **CURRENT**:
-  - Phase 5 in progress. Milestone 5.6 (Execution Mode & Model Capability Foundation) complete.
+  - Phase 5 in progress. Milestone 5.7 (Local Provider Implementation - Ollama) complete.
 - **NEXT**:
   - **Phase 5 — Concrete Providers, CRM Foundation & Routing**:
-    - Milestone 5.7: Local Provider Implementation (Ollama) (NEXT)
-    - Milestone 5.8: RAM-Aware Memory Lifecycle Manager
+    - Milestone 5.8: RAM-Aware Memory Lifecycle Manager (NEXT)
     - Milestone 5.9: Intelligent Task-to-Model Router (`ModelRouter`)
     - Milestone 5.10: First CRM Agent Integration with Dynamic Model Routing
 - **FUTURE (Re-sequenced)**:
@@ -250,16 +250,16 @@ gantt
 | **Dependencies** | Milestone 5.1, Milestone 5.2 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.7 — Local Provider Implementation (Ollama) (NEXT)
+### Milestone 5.7 — Local Provider Implementation (Ollama) ✅
 | Item | Detail |
 |---|---|
 | **Work** | Implement `OllamaProvider` conforming to `BaseProvider` using `httpx` for local SLM execution. Target lightweight quantized models suited for 8GB RAM laptops (Qwen2.5-1.5B, Llama-3.2-1B) and 16GB RAM laptops (Phi-3-mini 3.8B, Qwen2.5-3B). Provide health checks, offline reachability detection, zero-cloud operation, and error handling. Register into `ProviderManager`. |
 | **Acceptance** | Local provider generates completions without external network or API keys; graceful degradation when Ollama daemon is offline; strictly respects `LOCAL` mode boundary. |
-| **Tests** | `tests/test_ollama_provider.py` — mocked HTTP responses for local generation, offline failure, health check, latency tracking, parameter passthrough. |
+| **Tests** | `tests/test_ollama_provider.py` — mocked HTTP responses for local generation, offline failure, health check, latency tracking, parameter passthrough (23 tests). |
 | **Dependencies** | Milestone 5.6 |
-| **Status** | **PLANNED** |
+| **Status** | **COMPLETED** |
 
-### Milestone 5.8 — RAM-Aware Memory Lifecycle Manager
+### Milestone 5.8 — RAM-Aware Memory Lifecycle Manager (NEXT)
 | Item | Detail |
 |---|---|
 | **Work** | Build `ModelLifecycleManager` to govern local model loading and unloading in RAM/VRAM. Implement sequential single-model residency (lazy load before generation, immediate or TTL eviction via Ollama `keep_alive: 0` or unloading calls). Enforce hardware RAM ceilings: 8GB RAM profile (≤2.2GB model memory) and 16GB RAM profile (≤5.5GB model memory). |

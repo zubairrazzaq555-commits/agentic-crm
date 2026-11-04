@@ -174,6 +174,14 @@ class Settings(BaseSettings):
         alias="OLLAMA_DEFAULT_MODEL",
     )
 
+    ollama_timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=600.0,
+        description="Timeout in seconds for Ollama API requests.",
+        alias="OLLAMA_TIMEOUT",
+    )
+
     # -- Validators ---------------------------------------------------------
     @field_validator("execution_mode", mode="before")
     @classmethod
@@ -309,6 +317,7 @@ class Settings(BaseSettings):
             "huggingface_api_key": _mask(self.huggingface_api_key),
             "ollama_base_url": self.ollama_base_url,
             "ollama_default_model": self.ollama_default_model,
+            "ollama_timeout": str(self.ollama_timeout),
             "available_providers": ", ".join(self.get_available_providers()),
         }
 

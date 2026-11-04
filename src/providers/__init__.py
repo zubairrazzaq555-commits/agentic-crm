@@ -20,6 +20,7 @@ from src.providers.exceptions import (
 from src.providers.health import CircuitBreaker, CircuitState, HealthStatus
 from src.providers.manager import ProviderManager
 from src.providers.mock_provider import MockProvider
+from src.providers.ollama import OllamaProvider
 from src.providers.openrouter import OpenRouterProvider
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "MockProvider",
     "ModelDescriptor",
     "ModelTier",
+    "OllamaProvider",
     "OpenRouterProvider",
     "PaidProviderError",
     "ProviderError",
