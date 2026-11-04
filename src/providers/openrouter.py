@@ -15,7 +15,13 @@ from typing import Any, Dict, Optional
 import httpx
 
 from src.config import get_settings
-from src.providers.base import BaseProvider, ProviderResult
+from src.providers.base import (
+    BaseProvider,
+    ModelDescriptor,
+    ModelTier,
+    ProviderResult,
+    TaskComplexity,
+)
 from src.providers.exceptions import (
     ProviderError,
     ProviderUnavailableError,
@@ -45,6 +51,7 @@ class OpenRouterProvider(BaseProvider):
         timeout: float = 30.0,
         is_paid: bool = False,
         http_client: Optional[httpx.AsyncClient] = None,
+        descriptor: Optional[ModelDescriptor] = None,
     ) -> None:
         """Initialize OpenRouter provider.
 
@@ -58,6 +65,7 @@ class OpenRouterProvider(BaseProvider):
             timeout: HTTP request timeout in seconds.
             is_paid: Flag indicating paid tier. Defaults to False (free models only).
             http_client: Optional injected httpx.AsyncClient (e.g. for mocked testing).
+            descriptor: Optional model descriptor override.
         """
         self._name = name
         self._is_paid = is_paid
@@ -94,6 +102,17 @@ class OpenRouterProvider(BaseProvider):
         self._injected_client = http_client
         self._owned_client: Optional[httpx.AsyncClient] = None
 
+        self._descriptor = descriptor or ModelDescriptor(
+            model_id=self._model,
+            tier=ModelTier.LLM_LARGE,
+            is_local=False,
+            context_window=16384,
+            supports_structured_output=True,
+            ram_required_mb=None,
+            cost_per_1k_tokens=0.0,
+            supported_complexities=tuple(TaskComplexity),
+        )
+
     @property
     def name(self) -> str:
         """Unique identifier for this provider."""
@@ -108,6 +127,11 @@ class OpenRouterProvider(BaseProvider):
     def model_name(self) -> str:
         """The default model identifier used by this provider."""
         return self._model
+
+    @property
+    def descriptor(self) -> Optional[ModelDescriptor]:
+        """Model descriptor for this OpenRouter provider."""
+        return self._descriptor
 
     @property
     def base_url(self) -> str:

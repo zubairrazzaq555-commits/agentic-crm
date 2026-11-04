@@ -13,7 +13,70 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
+
+
+# ---------------------------------------------------------------------------
+# Model tiers and task complexity classifications
+# ---------------------------------------------------------------------------
+
+
+class ModelTier(str, Enum):
+    """Model capacity and parameter tier."""
+
+    SLM_SMALL = "slm_small"    # ~1B-3B parameters (e.g. Qwen 2.5 1.5B, Llama 3.2 1B/3B)
+    SLM_MEDIUM = "slm_medium"  # ~7B-14B parameters (e.g. Qwen 2.5 7B, Mistral 7B)
+    LLM_LARGE = "llm_large"    # ~70B+ or frontier cloud models
+
+
+class TaskComplexity(str, Enum):
+    """Classification of task reasoning requirements."""
+
+    DETERMINISTIC = "deterministic"  # Pure code, DB queries, formula math
+    EXTRACTION = "extraction"        # Regex / structured field extraction
+    CLASSIFICATION = "classification"# Intent routing, sentiment, triage
+    REASONING = "reasoning"          # Complex multi-step reasoning, synthesis
+    PLANNING = "planning"            # Strategic orchestration, tool sequencing
+
+
+# ---------------------------------------------------------------------------
+# Model capability descriptor
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ModelDescriptor:
+    """Descriptor capturing capabilities, resource footprint, and cost profile.
+
+    Attributes:
+        model_id: Identifier of the model (e.g. 'qwen2.5:1.5b', 'nemotron-3.5-lightning:free').
+        tier: Model capacity tier (SLM_SMALL, SLM_MEDIUM, LLM_LARGE).
+        is_local: Whether the model runs locally or on remote cloud.
+        context_window: Maximum context window size in tokens.
+        supports_structured_output: Whether JSON schema or tool calling is supported.
+        ram_required_mb: Estimated RAM footprint in MB for local models (None for cloud).
+        cost_per_1k_tokens: Cost per 1,000 tokens in USD (0.0 for local/free tiers).
+        supported_complexities: Tuple of task complexities this model is capable of handling.
+        metadata: Arbitrary additional model metadata.
+    """
+
+    model_id: str
+    tier: ModelTier = ModelTier.SLM_SMALL
+    is_local: bool = False
+    context_window: int = 4096
+    supports_structured_output: bool = True
+    ram_required_mb: int | None = None
+    cost_per_1k_tokens: float = 0.0
+    supported_complexities: tuple[TaskComplexity, ...] = (
+        TaskComplexity.EXTRACTION,
+        TaskComplexity.CLASSIFICATION,
+    )
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def can_handle(self, complexity: TaskComplexity) -> bool:
+        """Check whether this model descriptor supports the given task complexity."""
+        return complexity in self.supported_complexities
 
 
 # ---------------------------------------------------------------------------
@@ -131,3 +194,39 @@ class BaseProvider(abc.ABC):
         Returns:
             True if the provider is available, False otherwise.
         """
+
+    # -----------------------------------------------------------------------
+    # Optional capability and resource metadata (with sensible defaults)
+    # -----------------------------------------------------------------------
+
+    @property
+    def descriptor(self) -> ModelDescriptor | None:
+        """Optional capability and resource descriptor for this provider.
+
+        Returns None by default. Providers can optionally supply a ModelDescriptor
+        to support intelligent task routing and resource allocation.
+        """
+        return None
+
+    @property
+    def is_local(self) -> bool:
+        """Whether this provider runs locally.
+
+        Derived from descriptor.is_local if descriptor exists, otherwise False.
+        """
+        return self.descriptor.is_local if self.descriptor else False
+
+    def can_handle_complexity(self, complexity: TaskComplexity) -> bool:
+        """Check whether this provider can handle the requested task complexity.
+
+        Delegates to descriptor.can_handle(complexity) if a descriptor is present.
+        Otherwise provides a backward-compatible default: supports DETERMINISTIC,
+        EXTRACTION, and CLASSIFICATION.
+        """
+        if self.descriptor is not None:
+            return self.descriptor.can_handle(complexity)
+        return complexity in (
+            TaskComplexity.DETERMINISTIC,
+            TaskComplexity.EXTRACTION,
+            TaskComplexity.CLASSIFICATION,
+        )

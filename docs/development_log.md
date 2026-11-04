@@ -47,15 +47,18 @@ PROGRESS
 │   ├── 5.3 Hierarchy Design          ✅  (4 levels, 20 specialist agents, tools vs agents, 8GB/16GB RAM strategy)
 │   ├── 5.4 CRM Core DB & Sales Data  ✅  (Leads, Accounts, Contacts, Opps, Deals schemas, repos, services, tools)
 │   ├── 5.5 Sales Agent Execution     ✅  (Real CRM operations, intent extraction, graph integration, CLI execution)
-│   ├── 5.6 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
-│   └── 5.7 Task / Model Router       ⏳  (DEFERRED: Capability-based routing & fallback chain)
+│   ├── 5.6 Execution Mode & Models   ✅  (ExecutionMode, ModelTier, TaskComplexity, ModelDescriptor, settings guards)
+│   ├── 5.7 Local Provider (Ollama)   ⏳  (NEXT: Ollama local SLM execution / Groq)
+│   ├── 5.8 Task-to-Model Router      ⏳  (Capability-based routing & fallback chain)
+│   ├── 5.9 RAM & Lifecycle Mgr       ⏳  (ModelLifecycleManager, load/unload)
+│   └── 5.10 Hybrid Benchmarks        ⏳  (End-to-end routing benchmarks)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
 ├── Phase 7 — First CRM Feature       ⏳  (Leads CRUD, Scoring, Integration)
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 425 tests passed (exit code 0)
+**Last verified test count:** 461 tests passed (exit code 0)
 
 ---
 
@@ -77,12 +80,30 @@ PROGRESS
 | 5.2 LLM-Assisted Orchestrator Classification | Added controlled LLM-assisted domain classification fallback to Grandparent Orchestrator. Deterministic classifier remains primary. If uncertain, queries OpenRouter via ProviderManager using configured model (`nvidia/nemotron-3.5-lightning:free`). Validates strictly to supported domains with safe fallback to 'unknown' on error or invalid output. | `src/agents/orchestrator/classifier.py`, `src/agents/orchestrator/orchestrator.py`, `src/agents/orchestrator/state.py`, `src/agents/orchestrator/__init__.py` | `tests/test_orchestrator_llm.py` (40 tests) |
 | 5.3 Complete CRM Agent Hierarchy Design | Designed 4-level enterprise CRM Agent Hierarchy (`docs/CRM_AGENT_HIERARCHY.md`): Level 1 Orchestrator, Level 2 Domain Agents (Sales, Marketing, Service, Data), Level 3 Specialist Child Agents (20 total, 5 per domain), Level 4 Sub-specialists vs Deterministic Tools. Established strict rule: CRUD/SQL/calculations must never invoke models. Defined 8GB (≤1.5B model, ≤2.2GB RAM) and 16GB (≤3.8B model, ≤5.5GB RAM) memory budgets and SLM-first local execution roadmap. | `docs/CRM_AGENT_HIERARCHY.md`, `docs/architecture.md`, `docs/roadmap.md`, `docs/AGENT_HIERARCHY_AUDIT.md` | Zero regression (392 tests passing) |
 | 5.4 CRM Core Database & Sales Data Foundation | Foundational CRM database architecture for Sales domain: Leads, Accounts, Contacts, Opportunities, and Deals. Enabled foreign key enforcement in SQLite (`PRAGMA foreign_keys = ON;`), relational cascades, unique constraints, and schema registration via `metadata.create_all()`. Created clean Repositories (`LeadRepository`, `AccountRepository`, `ContactRepository`, `OpportunityRepository`, `DealRepository`), Services (`LeadService`, `AccountService`, `ContactService`, `OpportunityService`, `DealService`), and deterministic Level 4 Python tools (`create_lead_tool`, `qualify_lead_tool`, `convert_lead_tool`, `create_account_tool`, `create_deal_tool`, etc.). Bound services to `SalesDomainAgent`. | `src/crm/models.py`, `src/crm/repositories/`, `src/crm/services/`, `src/crm/tools/`, `src/crm/__init__.py`, `src/database/connection.py`, `src/agents/sales/` | `tests/test_crm_database.py`, `tests/test_crm_repositories.py`, `tests/test_crm_services.py`, `tests/test_crm_tools.py` (33 new tests, 425 total passing) |
+| 5.5 Sales Agent Execution | Real CRM sales operations executed via SalesDomainAgent, deterministic intent routing across all 5 sales subdomains, Grandparent Orchestrator integration, CLI intake execution, datetimes serialization | `src/agents/sales/intent.py`, `src/agents/sales/agent.py`, `src/agents/sales/handlers.py`, `src/agents/orchestrator/handlers.py`, `src/cli/intake.py` | `tests/test_sales_execution.py` (16 tests, 441 total passing) |
+| 5.6 Execution Mode & Model Capability Foundation | Local-first / API-optional / Cost-optimized foundation: ExecutionMode (LOCAL, CLOUD, HYBRID), ModelTier (SLM_SMALL, SLM_MEDIUM, LLM_LARGE), TaskComplexity (DETERMINISTIC, EXTRACTION, CLASSIFICATION, REASONING, PLANNING), ModelDescriptor, optional capability metadata on BaseProvider, strict local isolation guards (LOCAL mode forbids cloud calls; HYBRID requires explicit opt-in for cloud fallback; paid APIs strictly disabled) | `src/config.py`, `src/providers/base.py`, `src/providers/mock_provider.py`, `src/providers/openrouter.py`, `src/providers/__init__.py` | `tests/test_model_capability.py` (20 new tests, 461 total passing) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.5 complete. Preparing for Milestone 5.6 — Local Provider (Ollama / Local SLM).
+**Active milestone:** Milestone 5.6 complete (461 passing tests). Ready for Milestone 5.7 — Local SLM Provider (Ollama).
+
+**Milestone 5.6 Status:** COMPLETE
+- Implemented `ExecutionMode` enum (`LOCAL`, `CLOUD`, `HYBRID`) in `src/config.py`.
+- Added `execution_mode` and `allow_cloud_fallback` configuration settings to `Settings`.
+- Enforced strict isolation policies:
+  - `LOCAL` mode strictly blocks cloud fallback (auto-overridden to `False` with logged warning).
+  - `HYBRID` mode enables local execution with cloud fallback strictly requiring explicit user opt-in (`allow_cloud_fallback=True`).
+  - Added helper properties `can_use_local` and `can_use_cloud`.
+- Implemented `ModelTier` (`SLM_SMALL`, `SLM_MEDIUM`, `LLM_LARGE`) in `src/providers/base.py`.
+- Implemented `TaskComplexity` (`DETERMINISTIC`, `EXTRACTION`, `CLASSIFICATION`, `REASONING`, `PLANNING`) in `src/providers/base.py`.
+- Implemented `ModelDescriptor` dataclass (`model_id`, `tier`, `is_local`, `context_window`, `supports_structured_output`, `ram_required_mb`, `cost_per_1k_tokens`, `supported_complexities`, `metadata`, `can_handle()`).
+- Added non-intrusive capability metadata to `BaseProvider` (`descriptor`, `is_local`, `can_handle_complexity()`) preserving 100% backward compatibility for all existing providers.
+- Integrated default descriptors into `MockProvider` (local, SLM_SMALL) and `OpenRouterProvider` (cloud, LLM_LARGE).
+- Exported all new enums and classes in `src/providers/__init__.py` and `src/config.py`.
+- Added comprehensive unit tests in `tests/test_model_capability.py` (20 new tests).
+- All 461 project tests passing (0 failures, 100% pass rate).
 
 **Milestone 5.5 Status:** COMPLETE
 - Implemented deterministic intent parser (`extract_sales_intent`) in `src/agents/sales/intent.py` supporting all 5 Sales subdomains:
@@ -98,7 +119,7 @@ PROGRESS
 - Ensured event loop safety for SQLAlchemy `AsyncEngine` across async/sync thread boundaries.
 - Updated CLI intake layer (`submit_task`, `format_task_output`) with JSON serialization of datetimes and human-readable CRM execution reporting.
 - Added comprehensive test suite in `tests/test_sales_execution.py` (16 tests).
-- All 441 tests passing (100% pass rate, exit code 0).
+- All 441 tests passing (100% pass rate, exit code 0). Committed and pushed as `5fa0d06`.
 
 ---
 
@@ -137,17 +158,23 @@ None currently.
 | Memory Management | Lazy model loading & single-model concurrency | Keeps memory within strict 2.2GB (8GB RAM) and 5.5GB (16GB RAM) budgets |
 | Subdomain Handler Status Contract | `status: "COMPLETED" if success else "FAILED"`, `success: bool`, `error: Optional[str]` | Aligns with LangGraph node completion while distinguishing business logic outcome |
 | Orchestrator Delegation Contract | `execution_status: "SUCCESS"` on completed delegation, nested `sales_agent_result` for domain outcome | Decouples pipeline delegation health from domain-level CRM operation results |
+| Multi-Tier Execution Modes | `LOCAL`, `CLOUD`, `HYBRID` (Configurable; Default: `HYBRID`) | Allows user full control over offline privacy vs cloud resource offloading |
+| Local-Only Isolation | Never makes external API or network calls in `LOCAL` mode | Guarantees complete data privacy and offline autonomy |
+| Explicit Cloud Fallback in Hybrid | `HYBRID` mode defaults to local SLM; cloud fallback requires explicit opt-in (`allow_cloud_fallback=True`) | Prevents unexpected cloud calls or secret egress without explicit user consent |
+| Universal Cost Ceiling | `allow_paid_apis=False` strictly enforced across all modes | Ensures system remains strictly 100% free-tier / local ($0 cost) |
+| Model Router Decoupling | Router sits between agents and ProviderManager; no permanent agent-model coupling | Prevents agent bloat and enables dynamic model swapping based on task complexity |
 
 ---
 
 ## Next Step
 
-**Milestone 5.6 — Local Provider (Ollama / Local SLMs)**
+**Milestone 5.6 — Execution Mode & Model Capability Foundation**
 
-Implement `OllamaProvider` conforming to `BaseProvider`:
-- Local SLM execution via Ollama HTTP API.
-- Support for target lightweight models (Qwen2.5-1.5B, Phi-3-mini 3.8B).
-- Register into `ProviderManager` with health check, availability detection, and zero-cloud fallback.
+Establish the multi-tier execution mode architecture and model capability taxonomy:
+- Add `ExecutionMode` (`LOCAL`, `CLOUD`, `HYBRID`) and `allow_cloud_fallback` configuration to `Settings`.
+- Enforce strict mode boundaries: `LOCAL` mode never makes external network calls; `HYBRID` mode only calls cloud fallback if `allow_cloud_fallback=True`.
+- Define `ModelDescriptor`, `ModelTier` (`SLM_SMALL`, `SLM_MEDIUM`, `LLM_LARGE`), and `TaskComplexity` (`DETERMINISTIC`, `EXTRACTION`, `CLASSIFICATION`, `REASONING`, `PLANNING`).
+- Extend `BaseProvider` to declare model capabilities while preserving backward compatibility with `MockProvider` and `OpenRouterProvider`.
 - Reference: `docs/roadmap.md` → Phase 5, Milestone 5.6
 
 ---
@@ -157,11 +184,9 @@ Implement `OllamaProvider` conforming to `BaseProvider`:
 ```
 Branch:      main
 Remote:      origin/main
-Last commit: 3d31dda  feat: implement LLM-assisted orchestrator classification (Milestone 5.2)
+Last commit: 5fa0d06  feat: complete milestone 5.5 sales agent execution
 
 Uncommitted work:
-  CREATED   docs/CRM_AGENT_HIERARCHY.md
-  CREATED   docs/AGENT_HIERARCHY_AUDIT.md
   MODIFIED  docs/architecture.md
   MODIFIED  docs/roadmap.md
   MODIFIED  docs/development_log.md

@@ -4,7 +4,13 @@ Provides the base provider interface, provider result structure,
 health tracking, circuit breaker, and provider manager.
 """
 
-from src.providers.base import BaseProvider, ProviderResult
+from src.providers.base import (
+    BaseProvider,
+    ModelDescriptor,
+    ModelTier,
+    ProviderResult,
+    TaskComplexity,
+)
 from src.providers.exceptions import (
     PaidProviderError,
     ProviderError,
@@ -22,6 +28,8 @@ __all__ = [
     "CircuitState",
     "HealthStatus",
     "MockProvider",
+    "ModelDescriptor",
+    "ModelTier",
     "OpenRouterProvider",
     "PaidProviderError",
     "ProviderError",
@@ -29,4 +37,5 @@ __all__ = [
     "ProviderNotFoundError",
     "ProviderResult",
     "ProviderUnavailableError",
+    "TaskComplexity",
 ]

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 # ---------------------------------------------------------------------------
@@ -55,6 +55,14 @@ class LogLevel(str, Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class ExecutionMode(str, Enum):
+    """Application AI execution mode."""
+
+    LOCAL = "local"
+    CLOUD = "cloud"
+    HYBRID = "hybrid"
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +98,18 @@ class Settings(BaseSettings):
     )
 
     # -- Provider policy ----------------------------------------------------
+    execution_mode: ExecutionMode = Field(
+        default=ExecutionMode.HYBRID,
+        description="AI execution mode: local, cloud, or hybrid.",
+        alias="AGENTIC_CRM_EXECUTION_MODE",
+    )
+
+    allow_cloud_fallback: bool = Field(
+        default=False,
+        description="Whether hybrid mode may fall back to cloud providers. Requires explicit opt-in.",
+        alias="AGENTIC_CRM_ALLOW_CLOUD_FALLBACK",
+    )
+
     max_retries: int = Field(
         default=3,
         ge=0,
@@ -155,6 +175,14 @@ class Settings(BaseSettings):
     )
 
     # -- Validators ---------------------------------------------------------
+    @field_validator("execution_mode", mode="before")
+    @classmethod
+    def normalize_execution_mode(cls, v: object) -> object:
+        """Accept execution mode in any case (e.g. 'LOCAL' → 'local')."""
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
     @field_validator("log_level", mode="before")
     @classmethod
     def normalize_log_level(cls, v: object) -> object:
@@ -188,6 +216,20 @@ class Settings(BaseSettings):
             return False
         return v
 
+    @model_validator(mode="after")
+    def enforce_execution_mode_guards(self) -> Settings:
+        """
+        Enforce strict isolation rules for execution modes:
+        - In LOCAL mode, cloud fallback is strictly forbidden and overridden to False.
+        """
+        if self.execution_mode == ExecutionMode.LOCAL and self.allow_cloud_fallback:
+            logging.getLogger("agentic_crm.config").warning(
+                "AGENTIC_CRM_ALLOW_CLOUD_FALLBACK was set to True but execution_mode is LOCAL. "
+                "Enforcing local isolation policy: overriding allow_cloud_fallback to False."
+            )
+            self.allow_cloud_fallback = False
+        return self
+
     # -- Pydantic settings configuration ------------------------------------
     model_config = {
         "env_file": None,  # We load .env manually above for more control
@@ -197,6 +239,26 @@ class Settings(BaseSettings):
     }
 
     # -- Utility methods ----------------------------------------------------
+    @property
+    def can_use_local(self) -> bool:
+        """Whether local model execution is permitted under current settings."""
+        return self.execution_mode in (ExecutionMode.LOCAL, ExecutionMode.HYBRID)
+
+    @property
+    def can_use_cloud(self) -> bool:
+        """
+        Whether cloud model execution is permitted under current settings.
+
+        Strictly False in LOCAL mode.
+        In HYBRID mode, True only if allow_cloud_fallback is explicitly True.
+        In CLOUD mode, True.
+        """
+        if self.execution_mode == ExecutionMode.LOCAL:
+            return False
+        if self.execution_mode == ExecutionMode.CLOUD:
+            return True
+        return self.allow_cloud_fallback
+
     @property
     def database_url(self) -> str:
         """Build the SQLAlchemy async database URL from db_path."""
@@ -235,6 +297,10 @@ class Settings(BaseSettings):
             "log_level": self.log_level.value,
             "db_path": self.db_path,
             "database_url": self.database_url,
+            "execution_mode": self.execution_mode.value,
+            "allow_cloud_fallback": str(self.allow_cloud_fallback),
+            "can_use_local": str(self.can_use_local),
+            "can_use_cloud": str(self.can_use_cloud),
             "max_retries": str(self.max_retries),
             "allow_paid_apis": str(self.allow_paid_apis),
             "gemini_api_key": _mask(self.gemini_api_key),
@@ -245,6 +311,15 @@ class Settings(BaseSettings):
             "ollama_default_model": self.ollama_default_model,
             "available_providers": ", ".join(self.get_available_providers()),
         }
+
+
+__all__ = [
+    "Environment",
+    "ExecutionMode",
+    "LogLevel",
+    "Settings",
+    "get_settings",
+]
 
 
 @lru_cache(maxsize=1)

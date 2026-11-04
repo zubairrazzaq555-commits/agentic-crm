@@ -97,7 +97,16 @@ Cross-Cutting Execution & Infrastructure:
   │  1. Deterministic Python Tools / SQL queries (Cost: $0)  │
   │  2. Local SLMs (Ollama ≤1.5B/3.8B - 8GB/16GB RAM)       │
   │  3. Free Cloud LLMs (OpenRouter/Groq/Gemini free tiers)  │
+  │  Strict Mode Enforcement: LOCAL / CLOUD / HYBRID         │
   │  Strict No-Paid-Fallback policy enforced                │
+  │  Local-only: zero external network calls                │
+  │  Hybrid: cloud fallback requires explicit opt-in        │
+  └───────────────────────────┬─────────────────────────────┘
+                              │
+  ┌───────────────────────────▼─────────────────────────────┐
+  │         MEMORY LIFECYCLE MANAGER (Planned)              │
+  │  Single-model concurrency, lazy loading, prompt unload   │
+  │  Enforces 8GB (≤2.2GB) & 16GB (≤5.5GB) RAM budgets       │
   └───────────────────────────┬─────────────────────────────┘
                               │
   ┌───────────────────────────▼─────────────────────────────┐
@@ -110,7 +119,7 @@ Cross-Cutting Execution & Infrastructure:
   ┌───────────────────────────▼─────────────────────────────┐
   │               PERSISTENCE LAYER [IMPLEMENTED]           │
   │  SQLite database (tasks, task_queue, providers, audit)  │
-  │  Future CRM Entities: leads, contacts, accounts, deals   │
+  │  CRM Entities: leads, accounts, contacts, opps, deals   │
   └─────────────────────────────────────────────────────────┘
 ```
 
@@ -146,40 +155,54 @@ The system strictly delineates responsibilities across four hierarchical levels 
   - Invoked only for unstructured reasoning, sentiment analysis, email synthesis, or entity extraction.
   - Powered by local SLMs (e.g. Qwen2.5-1.5B or Phi-3-mini) through the Provider Manager.
 
-### 4.5 Hardware Profiling & Memory Budgets (8GB vs 16GB RAM)
-To ensure reliable operation on standard laptops without requiring a dedicated GPU or crashing system memory:
+### 4.5 Execution Modes & User Configuration
+The Agentic CRM supports three explicit user execution modes configured via `AGENTIC_CRM_EXECUTION_MODE`:
+1. **`LOCAL` (Offline / Local-First):**
+   - Strictly utilizes local Small Language Models (e.g., Ollama / local runtime).
+   - **Isolation Guarantee:** Local-only mode **must NEVER make external network calls or cloud API requests**.
+   - $0 cost, zero data egress, complete data privacy, and full offline operation.
+2. **`CLOUD` (API-Based / Low-Resource):**
+   - Strictly utilizes free-tier cloud APIs (OpenRouter, Groq, Gemini free tiers).
+   - Zero local model memory consumption, enabling full CRM operation on resource-constrained devices.
+3. **`HYBRID` (Local-First with Controlled Fallback - Default):**
+   - Routinely routes tasks to local SLMs (1B–3B models for extraction, classification, and drafting).
+   - **Fallback Guard:** Hybrid mode defaults to local-only execution and **never uses cloud fallback unless the user explicitly enables cloud fallback** (`AGENTIC_CRM_ALLOW_CLOUD_FALLBACK=true`).
+   - If local SLM execution fails or is unavailable and cloud fallback is disabled, the system gracefully falls back to deterministic Python routines.
+4. **Universal Cost Policy:**
+   - Paid APIs remain strictly disabled by default (`AGENTIC_CRM_ALLOW_PAID_APIS=false`). The system operates under a strict $0 ceiling.
+
+### 4.6 Hardware Profiling & RAM-Efficient Memory Management
+To ensure reliable local SLM execution on commodity laptops without dedicated GPUs or memory crashes:
 - **8 GB RAM Profile:**
   - Operating System & Agent CRM Core: ~4.5 GB to 5.0 GB
   - Model Memory Ceiling: **≤2.2 GB**
   - Target Models: Qwen2.5-1.5B (Q4_K_M ~1.1 GB) or Llama-3.2-1B (Q4_K_M ~0.9 GB)
-  - Strategy: Strict single-model concurrency, lazy loading into RAM only during inference.
 - **16 GB RAM Profile:**
   - Operating System & Agent CRM Core: ~6.0 GB to 7.0 GB
   - Model Memory Ceiling: **≤5.5 GB**
   - Target Models: Phi-3-mini 3.8B (Q4_K_M ~2.4 GB) or Qwen2.5-3B (Q4_K_M ~2.0 GB)
-  - Strategy: Fast local inference on CPU/iGPU, background model pre-warming.
+- **Memory Lifecycle Manager (`ModelLifecycleManager`):**
+  - **Single-Model Concurrency:** Only one local model resides in RAM at any given time.
+  - **Lazy Loading & Explicit Eviction:** Models are loaded into memory on demand and evicted/unloaded (e.g. Ollama `keep_alive: 0`) after inference completes, freeing system RAM for database and agent processing.
 
-### 4.6 Task / Model Router
-- **Separate component** from the agent hierarchy.
-- Called by any agent or tool that needs to decide *how* to execute a sub-task.
-- Decision logic:
-  1. **Can this be done deterministically?** → Use a Python function or SQL query.
-  2. **Does this need pattern recognition?** → Use a conventional ML model.
-  3. **Does this need language understanding/generation at moderate quality?** → Use a local SLM via Ollama.
-  4. **Does this need higher-quality language capabilities?** → Use a free cloud LLM.
-  5. **Does this need the most capable model available?** → Use the best available free-tier model. **Never use a paid model.**
-- **Routing metadata:** Each task type can declare a `min_capability` level. The router finds the cheapest method that meets it.
-- **Quota awareness:** The router queries the Provider Manager for current availability before dispatching.
+### 4.7 Task / Model Router (`ModelRouter`)
+- **Independent Routing Service:** Called by agents when cognitive assistance is required; agents never couple directly to a specific provider or model.
+- **Decision Ladder:**
+  1. **Deterministic First:** If a task can be resolved by SQL, regex, or Python math $\to$ execute deterministically (0 tokens, 0 RAM, 0 latency).
+  2. **Assess Task Complexity:**
+     - `EXTRACTION` / `CLASSIFICATION`: Target `SLM_SMALL` (1B–3B local SLM or fast API).
+     - `REASONING` / `DISCOUNT_REVIEW`: Target `SLM_MEDIUM` (3B–8B model) or capable free cloud model.
+     - `COMPLEX_PLANNING`: Target `LLM_LARGE` (free cloud model or high-parameter local model).
+  3. **Filter by Execution Mode:**
+     - If `LOCAL`: select matching healthy local provider; if unavailable, degrade to deterministic.
+     - If `CLOUD`: select matching healthy cloud provider.
+     - If `HYBRID`: attempt local provider first; fall back to cloud API *only* if `allow_cloud_fallback=true`.
+  4. **Strict Safety:** Never select paid models. Protect API keys with redaction in all traces.
 
-### 4.7 Provider Manager
-- **Registry pattern:** Each provider (Gemini, Groq, Ollama, etc.) is a plugin implementing a common interface.
-- **Tracks per-provider:**
-  - Remaining quota (requests/day, tokens/minute)
-  - Current rate-limit status
-  - Health (up/down/degraded)
-  - Last error and backoff timer
-- **Circuit breaker:** After N consecutive failures, mark provider as "down" for a cooldown period.
-- **Strict policy:** A provider's `is_paid` flag is checked before every call. Paid providers are **never** selected automatically.
+### 4.8 Provider Manager
+- **Registry pattern:** Central registry managing provider instances (`BaseProvider`), health states (`HEALTHY`, `DEGRADED`, `UNHEALTHY`), and circuit breakers.
+- **Provider decoupling:** Providers implement standardized `generate()` and `check_availability()` returning uniform `ProviderResult`.
+- **Circuit breaker:** Isolates failing providers after N consecutive failures with cooldown timers.
 
 ### 4.8 Persistence Layer & CRM Core Database
 - **SQLite database** with well-defined schemas managed via SQLAlchemy Core and `aiosqlite`.
@@ -234,8 +257,10 @@ User/Event → Intake → Create Task record (status: PENDING)
 
 | Scenario | Behavior |
 |---|---|
-| **Provider rate-limited** | Backoff with jitter, try next provider in priority order |
-| **All cloud providers exhausted** | Fall back to local SLM; if that fails, mark task as `PENDING_RECOVERY` |
+| **Provider rate-limited** | Backoff with jitter, try next eligible provider in priority order |
+| **Local SLM unavailable (LOCAL mode)** | Degrade gracefully to deterministic Python fallback; never call external APIs |
+| **Local SLM unavailable (HYBRID mode)** | Fall back to free cloud API *only* if `allow_cloud_fallback=true`; otherwise degrade to deterministic Python fallback |
+| **Cloud providers exhausted (CLOUD mode)** | Try next configured free cloud provider; if all exhausted, degrade to deterministic fallback |
 | **Task fails after max retries** | Mark as `FAILED`, log details, surface to user |
 | **System restarts** | Worker scans for `IN_PROGRESS` tasks older than timeout → requeue |
 | **Duplicate prevention** | Idempotency key checked before any side-effecting action |

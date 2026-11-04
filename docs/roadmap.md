@@ -28,12 +28,16 @@
     - Milestone 5.2: LLM-Assisted Orchestrator Classification (OpenRouter) ✅
     - Milestone 5.3: Complete CRM Agent Hierarchy Design ✅
     - Milestone 5.4: CRM Core Database & Sales Data Foundation ✅
+    - Milestone 5.5: Sales Agent Execution & CRM Integration ✅
+    - Milestone 5.6: Execution Mode & Model Capability Foundation ✅
 - **CURRENT**:
-  - Phase 5 in progress. Milestone 5.4 (CRM Core Database & Sales Data Foundation) complete.
+  - Phase 5 in progress. Milestone 5.6 (Execution Mode & Model Capability Foundation) complete.
 - **NEXT**:
   - **Phase 5 — Concrete Providers, CRM Foundation & Routing**:
-    - Milestone 5.5: Local Provider (Ollama / Local SLM) (NEXT)
-    - Milestone 5.6: Task / Model Router (DEFERRED)
+    - Milestone 5.7: Local Provider Implementation (Ollama) (NEXT)
+    - Milestone 5.8: RAM-Aware Memory Lifecycle Manager
+    - Milestone 5.9: Intelligent Task-to-Model Router (`ModelRouter`)
+    - Milestone 5.10: First CRM Agent Integration with Dynamic Model Routing
 - **FUTURE (Re-sequenced)**:
   - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
   - **Phase 7 — First CRM Feature**: Leads CRUD, rule-based scoring, Sales Agent integration
@@ -237,23 +241,50 @@ gantt
 | **Dependencies** | Milestone 4.2, Milestone 4.3, Milestone 5.4 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.6 — Local Provider (Ollama / Local SLMs) (NEXT)
+### Milestone 5.6 — Execution Mode & Model Capability Foundation ✅
 | Item | Detail |
 |---|---|
-| **Work** | Implement `OllamaProvider` conforming to `BaseProvider` for local SLM execution. Target efficient small models suited for 8GB RAM laptops (Qwen2.5-1.5B, Llama-3.2-1B) and 16GB RAM laptops (Phi-3-mini 3.8B, Qwen2.5-3B). Add optional cloud fast-inference provider (`GroqProvider`). Register into `ProviderManager` with health checks, rate limit handling, and zero-cloud fallback. |
-| **Acceptance** | Local provider executes completions without internet or API keys; graceful degradation when Ollama server is offline; strict memory safety. |
-| **Tests** | Mocked unit tests and optional live verification tests against local Ollama instance. |
-| **Dependencies** | Milestone 5.1, Milestone 5.3 |
-| **Status** | **NEXT** |
+| **Work** | Establish the multi-tier execution mode architecture and model capability taxonomy: 1) Add `ExecutionMode` (`LOCAL`, `CLOUD`, `HYBRID`) configuration to settings with `allow_cloud_fallback` flag (default `False`); 2) Define strict isolation rules: `LOCAL` mode never makes external network calls, `HYBRID` mode defaults to local SLM and never calls cloud fallback unless explicitly opted in, `allow_paid_apis` remains `False` by default; 3) Define `ModelDescriptor`, `ModelTier` (`SLM_SMALL` 1B-3B, `SLM_MEDIUM` 3B-8B, `LLM_LARGE` 14B+), and `TaskComplexity` (`DETERMINISTIC`, `EXTRACTION`, `CLASSIFICATION`, `REASONING`, `PLANNING`); 4) Extend `BaseProvider` to declare model capabilities while preserving backward compatibility with `MockProvider` and `OpenRouterProvider`. |
+| **Acceptance** | `ExecutionMode` selectable via environment/settings; `LOCAL` mode rejects cloud requests; `HYBRID` mode strictly blocks cloud fallback when `allow_cloud_fallback=False`; `BaseProvider` reports model capabilities; 100% test pass rate across existing 441 tests and 20 new tests. |
+| **Tests** | `tests/test_model_capability.py` — execution mode validation, cloud-fallback guard tests, capability descriptor schemas, provider capability reporting (20 tests). |
+| **Dependencies** | Milestone 5.1, Milestone 5.2 |
+| **Status** | **COMPLETED** |
 
-### Milestone 5.7 — Task / Model Router
+### Milestone 5.7 — Local Provider Implementation (Ollama) (NEXT)
 | Item | Detail |
 |---|---|
-| **Work** | `ModelRouter` with capability levels (DETERMINISTIC, ML, LOCAL_SLM, CLOUD_LLM, CLOUD_LLM_CAPABLE), routing logic that queries `ProviderManager` for availability, fallback chain, strict no-paid policy |
-| **Acceptance** | Router selects lowest-cost available method; falls back correctly when providers are down; never selects a paid provider; deterministic tasks bypass LLM entirely |
-| **Tests** | `test_model_router.py` — routing decisions with various provider availability scenarios, capability matching, paid-provider rejection |
-| **Dependencies** | Milestones 5.1–5.6 |
-| **Status** | **DEFERRED** |
+| **Work** | Implement `OllamaProvider` conforming to `BaseProvider` using `httpx` for local SLM execution. Target lightweight quantized models suited for 8GB RAM laptops (Qwen2.5-1.5B, Llama-3.2-1B) and 16GB RAM laptops (Phi-3-mini 3.8B, Qwen2.5-3B). Provide health checks, offline reachability detection, zero-cloud operation, and error handling. Register into `ProviderManager`. |
+| **Acceptance** | Local provider generates completions without external network or API keys; graceful degradation when Ollama daemon is offline; strictly respects `LOCAL` mode boundary. |
+| **Tests** | `tests/test_ollama_provider.py` — mocked HTTP responses for local generation, offline failure, health check, latency tracking, parameter passthrough. |
+| **Dependencies** | Milestone 5.6 |
+| **Status** | **PLANNED** |
+
+### Milestone 5.8 — RAM-Aware Memory Lifecycle Manager
+| Item | Detail |
+|---|---|
+| **Work** | Build `ModelLifecycleManager` to govern local model loading and unloading in RAM/VRAM. Implement sequential single-model residency (lazy load before generation, immediate or TTL eviction via Ollama `keep_alive: 0` or unloading calls). Enforce hardware RAM ceilings: 8GB RAM profile (≤2.2GB model memory) and 16GB RAM profile (≤5.5GB model memory). |
+| **Acceptance** | Models load on demand and unload after inference; RAM usage returns to baseline; concurrent model loading is prevented on low-memory profiles. |
+| **Tests** | `tests/test_memory_lifecycle.py` — load/unload state tracking, single-model concurrency enforcement, memory ceiling guards. |
+| **Dependencies** | Milestone 5.7 |
+| **Status** | **PLANNED** |
+
+### Milestone 5.9 — Intelligent Task-to-Model Router (`ModelRouter`)
+| Item | Detail |
+|---|---|
+| **Work** | Implement `ModelRouter` as an independent routing service called by agents. Routing decision ladder: 1) Deterministic Python tools always first ($0 cost, 0 RAM); 2) Evaluate `TaskComplexity`; 3) Filter available providers by user `ExecutionMode` (`LOCAL`, `CLOUD`, `HYBRID`); 4) Select lowest-cost capable model (preferring 1B-3B SLMs for extraction/classification); 5) Enforce fallback rules: In `HYBRID` mode, fallback to free cloud API *only* if `allow_cloud_fallback=True`; in `LOCAL` mode, never call cloud APIs; never call paid APIs. |
+| **Acceptance** | Router selects optimal execution method per task complexity and user mode; deterministic tasks bypass models; fallback strictly adheres to mode constraints; paid providers rejected. |
+| **Tests** | `tests/test_model_router.py` — mode-aware routing, task-complexity matching, cloud fallback opt-in enforcement, offline local degradation, paid rejection. |
+| **Dependencies** | Milestones 5.6–5.8 |
+| **Status** | **PLANNED** |
+
+### Milestone 5.10 — First CRM Agent Integration with Dynamic Model Routing
+| Item | Detail |
+|---|---|
+| **Work** | Connect the existing agent hierarchy to `ModelRouter`: 1) `GrandparentOrchestrator` routes ambiguous domain classification through `ModelRouter` instead of directly calling `ProviderManager.get_available_provider()`; 2) `SalesDomainAgent` utilizes `ModelRouter` for unstructured / conversational parameter extraction fallback when deterministic regex parsing is insufficient; 3) Full verification across pure `LOCAL`, pure `CLOUD`, and `HYBRID` modes. |
+| **Acceptance** | Ambiguous orchestrator tasks and conversational sales prompts successfully leverage routed models across all 3 modes; local-only runs with zero internet; full end-to-end task execution against SQLite. |
+| **Tests** | `tests/test_agent_model_routing.py` — end-to-end orchestrator and sales execution across LOCAL, CLOUD, and HYBRID configurations with mock providers; zero regression on existing 441 tests. |
+| **Dependencies** | Milestone 5.9, Milestone 5.5 |
+| **Status** | **PLANNED** |
 
 ---
 
@@ -287,33 +318,26 @@ gantt
 
 ---
 
-## Phase 7 — First CRM Feature: Leads
+## Phase 7 — Marketing & Customer Service Domain Foundations
 
-**Goal:** A real CRM capability — managing and scoring leads — wired through the full agent hierarchy.
+**Goal:** Expand core CRM domains beyond Sales to include Marketing and Customer Service foundations.
+*(Note: Core Sales foundation — Leads, Accounts, Contacts, Opportunities, Deals, Repositories, Services, and Tools — was completed in Milestones 5.4 and 5.5).*
 
-### Milestone 7.1 — Leads Module (CRUD)
+### Milestone 7.1 — Marketing CRM Core Foundation
 | Item | Detail |
 |---|---|
-| **Work** | `Lead` model (name, email, company, source, status, score, notes, timestamps), CRUD service, database table and migration |
-| **Acceptance** | Leads can be created, read, updated, deleted, listed with filters |
-| **Tests** | `test_leads_crud.py` — full CRUD, validation, filtering |
-| **Dependencies** | Milestone 6.3 |
+| **Work** | Marketing domain database schemas (`campaigns`, `campaign_members`, `email_campaigns`, `email_events`, `audience_segments`, `marketing_automations`), repositories, services, and deterministic Level 4 Python tools; integration with existing Leads and Contacts. |
+| **Acceptance** | Multi-channel campaigns, email campaign tracking, dynamic audience segmentation, and automation triggers operational deterministically against SQLite. |
+| **Tests** | `tests/test_crm_marketing_*.py` — database, repository, service, and tool tests. |
+| **Dependencies** | Phase 5, Milestone 5.5 |
 
-### Milestone 7.2 — Lead Scoring (Rules-Based)
+### Milestone 7.2 — Customer Service CRM Core Foundation
 | Item | Detail |
 |---|---|
-| **Work** | Rule-based lead scoring engine (configurable criteria: company size, source, engagement), score calculation, score persistence |
-| **Acceptance** | New or updated leads get a score; scoring rules can be configured without code changes |
-| **Tests** | `test_lead_scoring.py` — various lead profiles, edge cases, config changes |
+| **Work** | Support domain schemas (`tickets`, `ticket_events`, `sla_policies`), ticket lifecycle management, deterministic triage tools, and customer satisfaction tracking. |
+| **Acceptance** | Ticket creation, priority assignment, status transitions, and SLA tracking operational against SQLite. |
+| **Tests** | `tests/test_crm_service_*.py` — database, repository, service, and tool tests. |
 | **Dependencies** | Milestone 7.1 |
-
-### Milestone 7.3 — Sales Agent + Leads Integration
-| Item | Detail |
-|---|---|
-| **Work** | Wire Sales Agent to use Leads tools (create, score, qualify), orchestrator routes lead-related tasks to Sales Agent, optional LLM-powered lead summary |
-| **Acceptance** | `"Create lead: John Doe, ACME Corp"` → Lead created, scored, result returned via CLI |
-| **Tests** | `test_sales_leads_integration.py` — end-to-end with mock providers |
-| **Dependencies** | Milestones 7.1, 7.2, 4.2 |
 
 ---
 
