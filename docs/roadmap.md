@@ -31,12 +31,12 @@
     - Milestone 5.5: Sales Agent Execution & CRM Integration ✅
     - Milestone 5.6: Execution Mode & Model Capability Foundation ✅
     - Milestone 5.7: Local Provider Implementation (Ollama) ✅
+    - Milestone 5.8: RAM-Aware Memory Lifecycle Manager ✅
 - **CURRENT**:
-  - Phase 5 in progress. Milestone 5.7 (Local Provider Implementation - Ollama) complete.
+  - Phase 5 in progress. Milestone 5.8 (RAM-Aware Memory Lifecycle Manager) complete.
 - **NEXT**:
   - **Phase 5 — Concrete Providers, CRM Foundation & Routing**:
-    - Milestone 5.8: RAM-Aware Memory Lifecycle Manager (NEXT)
-    - Milestone 5.9: Intelligent Task-to-Model Router (`ModelRouter`)
+    - Milestone 5.9: Intelligent Task-to-Model Router (`ModelRouter`) (NEXT)
     - Milestone 5.10: First CRM Agent Integration with Dynamic Model Routing
 - **FUTURE (Re-sequenced)**:
   - **Phase 6 — Reliability & Recovery**: Worker loop, crash recovery, idempotency, audit logging
@@ -259,14 +259,14 @@ gantt
 | **Dependencies** | Milestone 5.6 |
 | **Status** | **COMPLETED** |
 
-### Milestone 5.8 — RAM-Aware Memory Lifecycle Manager (NEXT)
+### Milestone 5.8 — RAM-Aware Memory Lifecycle Manager ✅
 | Item | Detail |
 |---|---|
 | **Work** | Build `ModelLifecycleManager` to govern local model loading and unloading in RAM/VRAM. Implement sequential single-model residency (lazy load before generation, immediate or TTL eviction via Ollama `keep_alive: 0` or unloading calls). Enforce hardware RAM ceilings: 8GB RAM profile (≤2.2GB model memory) and 16GB RAM profile (≤5.5GB model memory). |
 | **Acceptance** | Models load on demand and unload after inference; RAM usage returns to baseline; concurrent model loading is prevented on low-memory profiles. |
-| **Tests** | `tests/test_memory_lifecycle.py` — load/unload state tracking, single-model concurrency enforcement, memory ceiling guards. |
+| **Tests** | `tests/test_memory_lifecycle.py` — load/unload state tracking, single-model concurrency enforcement, memory ceiling guards (31 tests). |
 | **Dependencies** | Milestone 5.7 |
-| **Status** | **PLANNED** |
+| **Status** | **COMPLETED** |
 
 ### Milestone 5.9 — Intelligent Task-to-Model Router (`ModelRouter`)
 | Item | Detail |

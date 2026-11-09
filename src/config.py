@@ -65,6 +65,75 @@ class ExecutionMode(str, Enum):
     HYBRID = "hybrid"
 
 
+class HardwareProfile(str, Enum):
+    """Supported hardware RAM profiles for local SLM execution."""
+
+    AUTO = "auto"
+    PROFILE_8GB = "8gb"
+    PROFILE_16GB = "16gb"
+
+
+def detect_system_ram_mb() -> int:
+    """Detect total system physical RAM in megabytes using standard library.
+
+    Returns total RAM in MB, or 8192 MB (8GB) if detection fails or is unsupported.
+    """
+    try:
+        import sys
+        if sys.platform.startswith("win"):
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+                return int(stat.ullTotalPhys / (1024 * 1024))
+        elif sys.platform.startswith("linux"):
+            if hasattr(os, "sysconf"):
+                if "SC_PAGE_SIZE" in os.sysconf_names and "SC_PHYS_PAGES" in os.sysconf_names:
+                    page_size = os.sysconf("SC_PAGE_SIZE")
+                    phys_pages = os.sysconf("SC_PHYS_PAGES")
+                    return int((page_size * phys_pages) / (1024 * 1024))
+            if os.path.exists("/proc/meminfo"):
+                with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("MemTotal:"):
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                return int(int(parts[1]) / 1024)
+        elif sys.platform == "darwin":
+            if hasattr(os, "sysconf") and "SC_PAGE_SIZE" in os.sysconf_names and "SC_PHYS_PAGES" in os.sysconf_names:
+                page_size = os.sysconf("SC_PAGE_SIZE")
+                phys_pages = os.sysconf("SC_PHYS_PAGES")
+                return int((page_size * phys_pages) / (1024 * 1024))
+            try:
+                import ctypes
+                libc = ctypes.CDLL("libc.dylib")
+                memsize = ctypes.c_uint64(0)
+                size = ctypes.c_size_t(ctypes.sizeof(memsize))
+                if libc.sysctlbyname(b"hw.memsize", ctypes.byref(memsize), ctypes.byref(size), None, 0) == 0:
+                    return int(memsize.value / (1024 * 1024))
+            except Exception:
+                pass
+    except Exception as exc:
+        logging.getLogger("agentic_crm.config").debug(
+            "Failed to detect system RAM: %s. Defaulting to 8192 MB.", exc
+        )
+    return 8192
+
+
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
@@ -182,7 +251,36 @@ class Settings(BaseSettings):
         alias="OLLAMA_TIMEOUT",
     )
 
+    # -- Hardware profile & local memory budget -----------------------------
+    ram_profile: HardwareProfile = Field(
+        default=HardwareProfile.AUTO,
+        description="Hardware profile for local model execution (auto, 8gb, 16gb).",
+        alias="AGENTIC_CRM_RAM_PROFILE",
+    )
+
+    model_max_ram_mb: Optional[int] = Field(
+        default=None,
+        ge=512,
+        le=65536,
+        description="Explicit ceiling on local model memory in MB. Overrides profile default if set.",
+        alias="AGENTIC_CRM_MODEL_MAX_RAM_MB",
+    )
+
+    model_keep_alive: str = Field(
+        default="0",
+        description="Ollama keep_alive duration (e.g. '0' for immediate eviction, '5m' for 5 minutes).",
+        alias="AGENTIC_CRM_MODEL_KEEP_ALIVE",
+    )
+
     # -- Validators ---------------------------------------------------------
+    @field_validator("ram_profile", mode="before")
+    @classmethod
+    def normalize_ram_profile(cls, v: object) -> object:
+        """Accept ram profile values in any case (e.g. '8GB' → '8gb')."""
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
     @field_validator("execution_mode", mode="before")
     @classmethod
     def normalize_execution_mode(cls, v: object) -> object:
@@ -268,6 +366,25 @@ class Settings(BaseSettings):
         return self.allow_cloud_fallback
 
     @property
+    def resolved_ram_profile(self) -> HardwareProfile:
+        """Resolve AUTO profile to either PROFILE_8GB or PROFILE_16GB based on detected RAM."""
+        if self.ram_profile != HardwareProfile.AUTO:
+            return self.ram_profile
+        detected = detect_system_ram_mb()
+        if detected >= 12288:  # 12 GB threshold
+            return HardwareProfile.PROFILE_16GB
+        return HardwareProfile.PROFILE_8GB
+
+    @property
+    def model_ram_budget_mb(self) -> int:
+        """Return the effective local model RAM budget in MB."""
+        if self.model_max_ram_mb is not None:
+            return self.model_max_ram_mb
+        if self.resolved_ram_profile == HardwareProfile.PROFILE_16GB:
+            return 5500
+        return 2200
+
+    @property
     def database_url(self) -> str:
         """Build the SQLAlchemy async database URL from db_path."""
         return f"sqlite+aiosqlite:///{self.db_path}"
@@ -318,6 +435,10 @@ class Settings(BaseSettings):
             "ollama_base_url": self.ollama_base_url,
             "ollama_default_model": self.ollama_default_model,
             "ollama_timeout": str(self.ollama_timeout),
+            "ram_profile": self.ram_profile.value,
+            "resolved_ram_profile": self.resolved_ram_profile.value,
+            "model_ram_budget_mb": str(self.model_ram_budget_mb),
+            "model_keep_alive": self.model_keep_alive,
             "available_providers": ", ".join(self.get_available_providers()),
         }
 
@@ -325,8 +446,10 @@ class Settings(BaseSettings):
 __all__ = [
     "Environment",
     "ExecutionMode",
+    "HardwareProfile",
     "LogLevel",
     "Settings",
+    "detect_system_ram_mb",
     "get_settings",
 ]
 

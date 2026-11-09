@@ -92,6 +92,7 @@ class OllamaProvider(BaseProvider):
         timeout: Optional[float] = None,
         http_client: Optional[httpx.AsyncClient] = None,
         descriptor: Optional[ModelDescriptor] = None,
+        keep_alive: Optional[Any] = None,
     ) -> None:
         """Initialize Ollama provider.
 
@@ -103,6 +104,7 @@ class OllamaProvider(BaseProvider):
             timeout: HTTP request timeout in seconds.
             http_client: Optional injected httpx.AsyncClient (e.g. for mocked testing).
             descriptor: Optional model descriptor override.
+            keep_alive: Default keep_alive parameter for requests (defaults to settings.model_keep_alive).
         """
         self._name = name
         settings = get_settings()
@@ -130,9 +132,20 @@ class OllamaProvider(BaseProvider):
         else:
             self._timeout = getattr(settings, "ollama_timeout", DEFAULT_OLLAMA_TIMEOUT)
 
+        # Resolve keep_alive
+        if keep_alive is not None:
+            self._keep_alive = keep_alive
+        else:
+            self._keep_alive = getattr(settings, "model_keep_alive", "0")
+
         self._injected_client = http_client
         self._owned_client: Optional[httpx.AsyncClient] = None
         self._descriptor = descriptor or _infer_model_descriptor(self._model)
+
+    @property
+    def keep_alive(self) -> Any:
+        """Default keep_alive parameter for Ollama requests."""
+        return self._keep_alive
 
     @property
     def name(self) -> str:
@@ -263,6 +276,108 @@ class OllamaProvider(BaseProvider):
         except Exception:
             return False
 
+    async def load_model(
+        self,
+        model_name: Optional[str] = None,
+        keep_alive: Optional[Any] = None,
+    ) -> bool:
+        """Pre-load a model into Ollama memory without generating text.
+
+        In Ollama's API, sending a generate request with model identifier preloads
+        the model weights into memory/VRAM.
+
+        Args:
+            model_name: Model identifier to load. Defaults to configured model.
+            keep_alive: Optional keep_alive duration (e.g. '5m' or -1).
+
+        Returns:
+            True if model was successfully loaded into memory; False otherwise.
+
+        Raises:
+            ProviderUnavailableError: If Ollama daemon is unreachable or model is not pulled.
+            ProviderError: If the load request fails.
+        """
+        client = self._get_client()
+        target = model_name or self._model
+        payload: Dict[str, Any] = {
+            "model": target,
+        }
+        resolved_keep_alive = keep_alive if keep_alive is not None else self._keep_alive
+        if resolved_keep_alive is not None:
+            payload["keep_alive"] = resolved_keep_alive
+
+        url = f"{self._base_url}/api/generate"
+        try:
+            response = await client.post(url, json=payload)
+        except (httpx.ConnectError, httpx.NetworkError) as exc:
+            raise ProviderUnavailableError(
+                self._name, f"Ollama daemon unreachable during load_model at {self._base_url}: {exc}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderError(
+                f"Ollama load_model timed out after {self._timeout}s: {exc}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise ProviderUnavailableError(
+                self._name, f"Ollama HTTP request error during load_model: {exc}"
+            ) from exc
+
+        if response.status_code == 404:
+            raise ProviderUnavailableError(
+                self._name, f"Model '{target}' not found in Ollama"
+            )
+        if response.status_code != 200:
+            raise ProviderError(
+                f"Ollama load_model failed with status {response.status_code}: {response.text}"
+            )
+        return True
+
+    async def unload_model(self, model_name: Optional[str] = None) -> bool:
+        """Instruct Ollama to unload a model from memory by setting keep_alive: 0.
+
+        Note:
+            Sending keep_alive: 0 instructs the Ollama daemon to begin eviction.
+            Actual physical operating system RAM page release is handled asynchronously
+            by the host OS and Ollama runtime.
+
+        Args:
+            model_name: Model identifier to unload. Defaults to configured model.
+
+        Returns:
+            True if the unload request was accepted by Ollama; False otherwise.
+
+        Raises:
+            ProviderUnavailableError: If Ollama daemon is unreachable.
+            ProviderError: If the unload request fails.
+        """
+        client = self._get_client()
+        target = model_name or self._model
+        payload: Dict[str, Any] = {
+            "model": target,
+            "keep_alive": 0,
+        }
+        url = f"{self._base_url}/api/generate"
+        try:
+            response = await client.post(url, json=payload)
+        except (httpx.ConnectError, httpx.NetworkError) as exc:
+            raise ProviderUnavailableError(
+                self._name, f"Ollama daemon unreachable during unload_model at {self._base_url}: {exc}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderError(
+                f"Ollama unload_model timed out after {self._timeout}s: {exc}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise ProviderUnavailableError(
+                self._name, f"Ollama HTTP request error during unload_model: {exc}"
+            ) from exc
+
+        if response.status_code != 200:
+            raise ProviderError(
+                f"Ollama unload_model failed with status {response.status_code}: {response.text}"
+            )
+        return True
+
     async def generate(self, prompt: str, **kwargs: Any) -> ProviderResult:
         """Generate text completion from prompt via local Ollama.
 
@@ -301,6 +416,10 @@ class OllamaProvider(BaseProvider):
 
         if "format" in kwargs:
             payload["format"] = kwargs["format"]
+
+        resolved_keep_alive = kwargs.get("keep_alive", self._keep_alive)
+        if resolved_keep_alive is not None:
+            payload["keep_alive"] = resolved_keep_alive
 
         url = f"{self._base_url}/api/generate"
         start_time = time.perf_counter()

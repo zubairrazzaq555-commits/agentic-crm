@@ -49,8 +49,8 @@ PROGRESS
 │   ├── 5.5 Sales Agent Execution     ✅  (Real CRM operations, intent extraction, graph integration, CLI execution)
 │   ├── 5.6 Execution Mode & Models   ✅  (ExecutionMode, ModelTier, TaskComplexity, ModelDescriptor, settings guards)
 │   ├── 5.7 Local Provider (Ollama)   ✅  (OllamaProvider, local SLM execution, model detection, zero cost)
-│   ├── 5.8 RAM & Lifecycle Mgr       ⏳  (NEXT: ModelLifecycleManager, single-residency load/unload)
-│   ├── 5.9 Task-to-Model Router      ⏳  (Capability-based routing & fallback chain)
+│   ├── 5.8 RAM & Lifecycle Mgr       ✅  (ModelLifecycleManager, single-residency load/unload, budget gates)
+│   ├── 5.9 Task-to-Model Router      ⏳  (NEXT: Capability-based routing & fallback chain)
 │   └── 5.10 Hybrid Benchmarks        ⏳  (End-to-end routing benchmarks)
 │
 ├── Phase 6 — Reliability & Recovery  ⏳  (Worker, Idempotency, Audit)
@@ -58,7 +58,7 @@ PROGRESS
 └── Phase 8 — API & Scheduling        ⏳  (FastAPI, APScheduler)
 ```
 
-**Last verified test count:** 484 tests passed (exit code 0)
+**Last verified test count:** 515 tests passed (exit code 0)
 
 ---
 
@@ -83,16 +83,30 @@ PROGRESS
 | 5.5 Sales Agent Execution | Real CRM sales operations executed via SalesDomainAgent, deterministic intent routing across all 5 sales subdomains, Grandparent Orchestrator integration, CLI intake execution, datetimes serialization | `src/agents/sales/intent.py`, `src/agents/sales/agent.py`, `src/agents/sales/handlers.py`, `src/agents/orchestrator/handlers.py`, `src/cli/intake.py` | `tests/test_sales_execution.py` (16 tests, 441 total passing) |
 | 5.6 Execution Mode & Model Capability Foundation | Local-first / API-optional / Cost-optimized foundation: ExecutionMode (LOCAL, CLOUD, HYBRID), ModelTier (SLM_SMALL, SLM_MEDIUM, LLM_LARGE), TaskComplexity (DETERMINISTIC, EXTRACTION, CLASSIFICATION, REASONING, PLANNING), ModelDescriptor, optional capability metadata on BaseProvider, strict local isolation guards (LOCAL mode forbids cloud calls; HYBRID requires explicit opt-in for cloud fallback; paid APIs strictly disabled) | `src/config.py`, `src/providers/base.py`, `src/providers/mock_provider.py`, `src/providers/openrouter.py`, `src/providers/__init__.py` | `tests/test_model_capability.py` (20 new tests, 461 total passing) |
 | 5.7 Local Provider (Ollama) | OllamaProvider implementation conforming to BaseProvider: async generation via httpx (/api/generate), health checking (/api/version, /api/tags), installed model detection (list_models, is_model_available), ModelDescriptor inference (SLM_SMALL/MEDIUM/LARGE), $0 local cost ceiling, ProviderManager registration, LOCAL mode compatibility | `src/providers/ollama.py`, `src/providers/__init__.py`, `src/config.py` | `tests/test_ollama_provider.py` (23 new tests, 484 total passing) |
+| 5.8 RAM-Aware Memory Lifecycle Manager | ModelLifecycleManager governing local SLM load/unload in RAM/VRAM. HardwareProfile enum (AUTO, 8gb, 16gb) in Settings, standard-library total system RAM detection, approximate memory budget safety ceilings (≤2.2GB for 8GB profile, ≤5.5GB for 16GB profile), sequential single-model residency locks, Ollama unload via keep_alive: 0, robust eviction/load failure recovery | `src/config.py`, `src/providers/lifecycle.py`, `src/providers/ollama.py`, `src/providers/__init__.py` | `tests/test_memory_lifecycle.py` (31 new tests, 515 total passing) |
 
 ---
 
 ## Current
 
-**Active milestone:** Milestone 5.7 complete (484 passing tests). Ready for Milestone 5.8 — RAM-Aware Memory Lifecycle Manager.
+**Active milestone:** Milestone 5.8 complete (515 passing tests). Ready for Milestone 5.9 — Intelligent Task-to-Model Router (`ModelRouter`).
 
-**Milestone 5.7 Status:** COMPLETE
-- Implemented `OllamaProvider` conforming to `BaseProvider` in `src/providers/ollama.py`:
-  - Full asynchronous communication via `httpx.AsyncClient` with injected client support for isolated testing.
+**Milestone 5.8 Status:** COMPLETE
+- Implemented `HardwareProfile` enum (`AUTO`, `PROFILE_8GB`, `PROFILE_16GB`) in `src/config.py`.
+- Added standard-library RAM detection `detect_system_ram_mb()` supporting Windows, Linux, and macOS with fallback to 8192 MB.
+- Configured dynamic profile resolution (`resolved_ram_profile`) and customizable RAM budget ceiling (`model_ram_budget_mb`).
+- Built `ModelLifecycleManager` in `src/providers/lifecycle.py`:
+  - `ModelLoadState` tracking (`UNLOADED`, `RESERVED`, `LOADING`, `LOADED`, `UNLOADING`, `FAILED`).
+  - Distinct reservation (`acquire_model`), loading, and unloading stages with guarantee that models are never marked `LOADED` unless provider loading succeeds.
+  - Sequential single-model residency across 8GB and 16GB hardware profiles with extensible multi-model support.
+  - Safe failure recovery: eviction failures halt new model acquisitions without marking target model active; locks are always released.
+  - Approximate memory budget checking via `can_fit_model()` and `MemoryBudgetExceededError`.
+- Updated `OllamaProvider` in `src/providers/ollama.py`:
+  - Added `load_model(model_name)` and `unload_model(model_name)` with `keep_alive: 0` payload.
+  - Added configurable `keep_alive` parameter with settings resolution and per-request overrides.
+  - Documented asynchronous nature of host OS physical memory page reclamation.
+- Added comprehensive unit tests in `tests/test_memory_lifecycle.py` (31 tests, 100% mocked).
+- Verified full test suite: 515/515 passed (0 failures).
   - Configurable endpoints (`OLLAMA_BASE_URL`), default models (`OLLAMA_DEFAULT_MODEL`), and timeouts (`OLLAMA_TIMEOUT`).
   - Text generation (`generate()`) submitting to `/api/generate` with stream=False, options, and structured format support.
   - Multi-endpoint health checking (`check_availability()`) querying `/api/version` with graceful fallback to `/api/tags`.
